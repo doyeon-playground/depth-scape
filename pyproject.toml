@@ -23,6 +23,7 @@ depth = [
 
 [project.scripts]
 depth-scape-depth = "depth_scape.cli:main"
+depth-scape-layers = "depth_scape.layers_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "pipeline"}
