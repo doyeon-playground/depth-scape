@@ -1,16 +1,17 @@
-# ScenePort
+# DepthScape
 
-**Convierte escenas en espacios.**
+**Convierte una foto de paisaje en una escena 2.5D explorable.**
 
-ScenePort es un proyecto de código abierto que transforma fotos, vídeos y
-señales de cámaras en vivo en entornos 3D explorables. El desarrollo comienza
-con un prototipo de una sola imagen y avanza hacia la reconstrucción de vídeo
-multivista y la captura espacial con una cámara en vivo.
+DepthScape es un proyecto de código abierto que transforma una foto de paisaje
+en una escena por capas con profundidad. Estima la profundidad relativa, separa
+la imagen en primer plano, plano medio y fondo, genera pequeñas zonas ocultas
+por el primer plano y ofrece un efecto de paralaje limitado en el navegador.
 
 > [!IMPORTANT]
-> Una sola imagen no puede revelar la geometría de las zonas que no fueron
-> capturadas. El primer hito genera una escena 3D con profundidad inferida, no
-> una reconstrucción completa ni métricamente exacta.
+> DepthScape no recupera el contenido real detrás de un objeto. Las zonas
+> ocultas son generadas por IA a partir del contexto visible y deben señalarse
+> como contenido generado. El resultado es una experiencia visual 2.5D, no una
+> reconstrucción 3D completa ni métricamente exacta.
 
 ## Idiomas
 
@@ -22,35 +23,60 @@ multivista y la captura espacial con una cámara en vivo.
 
 La documentación en inglés es la fuente principal del proyecto.
 
-## Visión
+## Experiencia objetivo
 
-1. Crear una escena interactiva con profundidad a partir de una foto.
-2. Usar fotogramas de vídeo para reconstruir geometría más completa y coherente.
-3. Conectar una cámara para capturar y visualizar espacios casi en tiempo real.
+```text
+Foto de paisaje
+→ mapa de profundidad relativa
+→ capas de primer plano, plano medio y fondo
+→ máscaras de oclusión y huecos
+→ relleno de imagen y profundidad del fondo
+→ escena 2.5D por capas
+→ vista interactiva con paralaje limitado
+```
 
-## Primer MVP: de foto a 3D
+El primer visor limitará el movimiento de la cámara a un intervalo pequeño y
+documentado. Así se reduce el contenido generado y se atenúan los desgarros en
+los bordes de profundidad.
 
-- Aceptar una imagen JPG o PNG.
-- Estimar un mapa de profundidad a partir de la imagen.
-- Convertir el color y la profundidad estimada en geometría 3D con color.
-- Mostrar el resultado en un visor interactivo con órbita, desplazamiento y zoom.
-- Comunicar claramente las limitaciones de la reconstrucción.
+## Modelos de referencia iniciales
 
-La recuperación de superficies ocultas, la escala métrica, la geometría con
-calidad de producción y el procesamiento en tiempo real quedan fuera del primer
-hito.
+- **Depth Anything V2 Small:** candidato para profundidad relativa
+- **LaMa:** candidato para relleno de imagen RGB
+- **Código de DepthScape:** capas, visibilidad, profundidad oculta y escena
+
+Las versiones exactas, las licencias de los pesos, los requisitos de hardware y
+las alternativas se fijarán después de un experimento reproducible. Solo se
+considerará un pequeño modelo de corrección propio cuando exista una limitación
+importante y medible en la referencia.
+
+## Alcance
+
+- Aceptar una foto de paisaje JPG o PNG local.
+- Conservar la orientación y la relación de aspecto.
+- Mostrar la profundidad relativa y las máscaras de capa.
+- Generar solo el fondo necesario para el movimiento de cámara permitido.
+- Distinguir los píxeles observados de los generados.
+- Ofrecer paralaje limitado y accesible mediante teclado.
+- Guardar metadatos de configuración compactos para reproducir el resultado.
+
+La reconstrucción de vídeo, la cámara en vivo, el movimiento libre, la
+profundidad métrica y la reconstrucción completa de superficies ocultas quedan
+fuera del alcance.
 
 ## Estado del proyecto
 
-ScenePort se encuentra en la etapa de **planificación y creación de prototipos**.
-Las API, los formatos y los detalles de implementación pueden cambiar sin previo
-aviso.
+DepthScape está en la etapa de **planificación y evaluación de referencias**.
+Las API, los formatos, los modelos y los detalles de implementación pueden
+cambiar durante los primeros experimentos.
 
 ## Documentación
 
 - [Resumen del producto](../product-brief.md)
 - [Hoja de ruta](../roadmap.md)
 - [Arquitectura](../architecture.md)
+- [Modelos de referencia](../model-baselines.md)
+- [Decisión de alcance](../decisions/0001-focus-on-landscape-2-5d.md)
 - [Internacionalización](../i18n.md)
 - [Guía de contribución](../../CONTRIBUTING.md)
 
@@ -58,4 +84,4 @@ La documentación técnica detallada se mantiene actualmente en inglés.
 
 ## Licencia
 
-ScenePort se distribuye bajo la [Licencia MIT](../../LICENSE).
+DepthScape se distribuye bajo la [Licencia MIT](../../LICENSE).

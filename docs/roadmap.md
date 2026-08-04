@@ -1,66 +1,84 @@
 # Roadmap
 
-This roadmap describes outcomes, not fixed release dates. Each phase should
-produce a usable demonstration before the next phase expands the input type.
+This roadmap describes outcomes, not fixed release dates. DepthScape advances
+only when each phase produces a reproducible result with documented failure
+cases.
 
-## Phase 0: Foundation
+## Phase 0: Scope and baselines
 
-- Agree on terminology, product scope, and reconstruction claims.
-- Record candidate depth and 3D representation experiments.
-- Define a small set of redistributable sample images and expected artifacts.
-- Establish formatting, tests, and a reproducible local setup.
+- Fix the product boundary at one landscape photo and limited 2.5D motion.
+- Verify candidate model source, version, weight license, and hardware needs.
+- Select small, redistributable landscape samples with difficult edge cases.
+- Define observed, inferred, and generated pixel provenance.
+- Document image, depth, mask, layer, and camera coordinate conventions.
+- Establish a reproducible local or Colab experiment workflow.
 
-**Exit condition:** one documented experiment can turn a sample image into a
-viewable local 3D artifact.
+**Exit condition:** one documented command or notebook produces a depth map from
+a sample image and records all configuration needed to repeat the result.
 
-## Phase 1: Photo to 3D
+## Phase 1: Relative-depth baseline
 
-- Add image validation and preprocessing.
-- Generate and preview relative depth.
-- Produce colored 3D geometry from one image.
-- Build an interactive viewer with orbit, pan, zoom, and reset.
-- Display progress, errors, and reconstruction limitations.
-- Document local setup and the demo workflow.
+- Validate JPG and PNG inputs, orientation, aspect ratio, and size limits.
+- Run a candidate monocular relative-depth model.
+- Export a visual depth preview and compact run metadata.
+- Add numeric tests for transforms, normalization, and shape contracts.
+- Record failure cases such as sky, thin branches, water, and reflections.
 
-**Exit condition:** a user can select a photo and explore the inferred scene in
-one coherent workflow.
+**Exit condition:** the same input and configuration produce structurally
+consistent depth artifacts across repeated runs on a supported environment.
 
-## Phase 2: Video to 3D
+## Phase 2: Layer and occlusion construction
 
-- Extract and sample video frames.
-- Estimate camera motion and reject unsuitable frames.
-- Combine multi-view observations into a more consistent scene.
-- Add progress reporting, cancellation, and quality diagnostics.
-- Compare the video result with the single-image baseline.
+- Derive foreground, midground, and background masks from depth and edges.
+- Preserve thin structures where practical.
+- Define a bounded horizontal camera range.
+- Calculate disocclusion masks for that camera range.
+- Build a Layered Depth Image or equivalent inspectable representation.
 
-**Exit condition:** a documented capture sequence produces a scene that is more
-complete or view-consistent than the photo baseline.
+**Exit condition:** moving the virtual camera exposes known hole masks while the
+default viewpoint still matches the source composition.
 
-## Phase 3: Camera-connected capture
+## Phase 3: Background completion
 
-- Add camera permission and device-selection flows.
-- Provide capture guidance and coverage feedback.
-- Incrementally update the scene from incoming frames.
-- Define latency, privacy, storage, and hardware support expectations.
+- Evaluate a candidate RGB inpainting model on the required hole masks.
+- Add a strategy for coherent hidden depth, not color alone.
+- Preserve provenance masks for every generated pixel.
+- Prevent generated content outside the supported movement range from being
+  presented to the user.
+- Compare seams, repeated textures, depth ordering, and edge stability.
 
-**Exit condition:** a supported camera can update a spatial preview during a
-guided capture session.
+**Exit condition:** the documented landscape samples have complete color and
+depth coverage inside the allowed camera range, with generated regions clearly
+identified.
 
-## Phase 4: Product hardening
+## Phase 4: Interactive viewer
 
-- Benchmark representative devices and scenes.
-- Add export, metadata, and compatibility tests.
-- Improve accessibility and all supported locales.
-- Define secure retention and deletion behavior for any hosted inputs.
-- Package a reproducible release and public demo.
+- Package textures, masks, layers, camera bounds, and metadata as a scene.
+- Add horizontal parallax, reset, reduced-motion, and keyboard controls.
+- Add source, depth, layer, and generated-region inspection modes.
+- Localize the user-facing workflow in supported languages.
+- Validate current desktop browsers and define graceful capability errors.
 
-## Deferred decisions
+**Exit condition:** a user can create and inspect a bounded 2.5D scene through
+one coherent local workflow.
 
-The following choices should be made after small experiments rather than fixed
-during planning:
+## Phase 5: Quality and optional learning
 
-- depth-estimation model;
-- point cloud, mesh, radiance field, or Gaussian-based representation;
-- local, server, or hybrid inference;
-- native versus browser-based camera capture; and
-- final export formats and hosting platform.
+- Benchmark time, memory, seams, depth ordering, and visual stability.
+- Build a categorized failure set without private user media.
+- Consider a small DepthScape-specific correction model only for a measured
+  baseline limitation.
+- Add export and compatibility tests once the scene contract is stable.
+- Package a reproducible release and public demonstration.
+
+**Exit condition:** the project has documented supported scenes, failure cases,
+resource expectations, and a justified decision about custom training.
+
+## Explicitly deferred
+
+- Video reconstruction and temporal fusion.
+- Live-camera capture or real-time SLAM.
+- Unrestricted 3D navigation.
+- Metric reconstruction and hidden-surface ground truth.
+- Large-model training from scratch.
+- Cloud accounts, synchronization, and retained uploads.
