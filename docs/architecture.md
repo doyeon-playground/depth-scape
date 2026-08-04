@@ -58,6 +58,24 @@ Limited-parallax viewer
 - Identifies thin structures and ambiguous edges as explicit diagnostics.
 - Produces observed-region masks before any generated content is introduced.
 
+The provisional baseline first smooths relative depth inside low-edge regions,
+preserves strong RGB or depth discontinuities, and clusters the result into
+three ordered depth groups. It validates the source hash and normalized
+dimensions against the producing depth run before processing.
+
+| Artifact | Current contract |
+| --- | --- |
+| `layer-depth.npy` | float32 HxW edge-refined relative depth in `[0, 1]` |
+| `boundary-strength.npy` | float32 HxW RGB/depth edge union in `[0, 1]` |
+| `layer-map.npy` | uint8 HxW; `0=background`, `1=midground`, `2=foreground` |
+| `*-mask.png` | uint8 HxW; `255=included`, `0=excluded` |
+| `layer-preview.png` | RGB diagnostic palette; display only |
+| `layers.json` | hashes, coordinate convention, parameters, results, and warnings |
+
+The three masks are mutually exclusive and exhaustive. Their labels express
+relative ordering only; they do not identify objects, metric ranges, or hidden
+surfaces. Per-pixel data remains in binary artifacts rather than JSON.
+
 ### Visibility planner
 
 - Defines the supported virtual camera range.
