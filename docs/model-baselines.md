@@ -11,12 +11,20 @@ failure cases are documented in a reproducible experiment.
 
 ### Relative depth
 
-**Candidate:** Depth Anything V2 Small
+**Experimental baseline:** Depth Anything V2 Small
 
 The depth baseline predicts relative depth from one landscape image. The adapter
 must record preprocessing, output convention, model identifier, weight source,
 checksum where practical, and hardware path. DepthScape must not describe this
 output as metric depth without separate evidence.
+
+The first adapter uses the official Hugging Face Transformers checkpoint
+`depth-anything/Depth-Anything-V2-Small-hf` at immutable revision
+`5426e4f0f36572d16453bbda7a8389317b1bef99`. The Small model and weights are
+Apache-2.0 licensed; larger V2 variants are not interchangeable because their
+official weights use CC-BY-NC-4.0. Adoption remains provisional until the
+landscape failure set is measured. See
+[experiment 0001](experiments/0001-depth-baseline.md).
 
 ### RGB completion
 
