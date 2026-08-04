@@ -23,9 +23,10 @@ demo without making the trade-off explicit.
 
 ## Repository status
 
-The project is at an early planning and baseline-evaluation stage. Python is
-currently implied, but no framework, package layout, Python version, command
-runner, model dependency, or scene format has been established yet.
+The project is at an early baseline-evaluation stage. The pipeline and final
+viewer are local Python software. Python 3.10 through 3.13 and the current
+package layout are established, but the desktop GUI/rendering toolkit and final
+scene format remain deliberately unselected.
 
 - Treat checked-in configuration and documentation as the source of truth.
 - Do not introduce a framework, cloud service, database, or large dependency

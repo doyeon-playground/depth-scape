@@ -4,7 +4,8 @@
 
 DepthScape turns one landscape photograph into an explorable 2.5D scene. It
 combines relative-depth estimation, image layering, constrained inpainting, and
-a limited-parallax viewer to create a spatial impression from a flat image.
+a local Python parallax viewer to create a spatial impression from a flat
+image.
 
 ## Problem
 
@@ -65,8 +66,8 @@ sense of depth without mistaking generated regions for captured reality.
 ### Output
 
 - Preview the original image, relative-depth map, and layer masks.
-- Render a bounded horizontal parallax view with reset and reduced-motion
-  behavior.
+- Render a bounded horizontal parallax view in a local Python application with
+  reset and reduced-motion behavior.
 - Provide a generated-region overlay or equivalent disclosure.
 - Report failures without losing the selected local input.
 
@@ -89,7 +90,8 @@ sense of depth without mistaking generated regions for captured reality.
 - Recovering the true content behind visible objects.
 - Full 3D geometry or free-orbit navigation.
 - Metric depth or survey-grade accuracy.
-- Indoor, portrait, object-centric, video, or live-camera workflows.
+- Indoor, portrait, object-centric, video, or live-camera workflows. Video and
+  live capture are permanently excluded rather than later expansion stages.
 - Real-time capture, user accounts, cloud synchronization, or hosted storage.
 - Training a large foundation model during the initial milestone.
 
@@ -102,7 +104,8 @@ sense of depth without mistaking generated regions for captured reality.
 - Larger camera motion rapidly increases invented content and edge artifacts.
 - Existing model weights may have licenses that restrict redistribution or
   commercial use.
-- Browser rendering capability and local inference performance will vary.
+- Desktop graphics capability, packaging behavior, and local inference
+  performance will vary across supported Python environments.
 - The initial layered representation and export contract still require a
   measured experiment.
 
