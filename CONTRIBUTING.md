@@ -1,49 +1,54 @@
-# Contributing to ScenePort
+# Contributing to DepthScape
 
-ScenePort is in an early planning and prototyping stage. Small, reproducible
-changes are easier to evaluate than broad rewrites.
+DepthScape is in an early planning and baseline-evaluation stage. Small,
+reproducible changes are easier to evaluate than broad rewrites.
 
 ## Before contributing
 
 - Search existing issues before opening a new one.
 - Use an issue to discuss changes that alter product scope, architecture,
-  artifact formats, model dependencies, privacy behavior, or supported locales.
+  artifact formats, camera limits, model dependencies, privacy behavior, or
+  supported locales.
 - Never add private or copyrighted test media without redistribution rights.
 - Record the source and license of external models, weights, datasets, and
   sample assets.
+- Do not describe AI-generated hidden content as recovered reality.
 
 ## Development workflow
 
-1. Create a branch from `main`.
+1. Create a short-lived branch from the latest `main`.
 2. Keep the change focused and include documentation or tests when relevant.
 3. Run the checks documented by the affected component.
-4. Open a pull request describing the problem, approach, verification, and any
-   known limitations.
+4. Open a pull request describing the problem, approach, verification, and known
+   limitations.
 
 Suggested branch names:
 
 ```text
-feat/photo-depth-preview
-fix/viewer-camera-reset
-docs/update-photo-scope
+feature/depth-preview
+fix/hole-mask-edge
+docs/camera-limits
 ```
 
-Suggested commit prefixes are `feat`, `fix`, `docs`, `test`, `refactor`,
-`build`, and `chore`.
+Commit titles follow `<type>: <description>` without a scope. Common types are
+`feat`, `fix`, `docs`, `test`, `refactor`, `build`, and `chore`.
 
-## Experimental reconstruction work
+## Experimental depth and completion work
 
 An experiment should state:
 
 - the input and expected output;
-- model and dependency versions;
-- relevant hardware and runtime information;
-- configuration and preprocessing steps;
+- model, weight, and dependency versions;
+- code and weight licenses;
+- relevant hardware, precision, input size, runtime, and peak memory;
+- configuration, seed, and preprocessing steps;
+- output shapes, numeric ranges, and coordinate conventions;
 - qualitative or quantitative observations;
-- known failure cases; and
-- license implications.
+- generated-region provenance; and
+- known failure cases.
 
-Do not present single-image inferred depth as measured geometry.
+Do not present relative depth as metric depth. RGB inpainting experiments must
+also explain how hidden depth and foreground/background ordering are handled.
 
 ## Documentation and translations
 
@@ -52,12 +57,14 @@ Spanish are supported translations. Update English first, then update or flag
 affected translations according to [the i18n guide](docs/i18n.md).
 
 Translation contributions should preserve intent rather than mirror English
-word order. Keep filenames, commands, code, and locale identifiers unchanged.
+word order. Keep filenames, commands, code, model identifiers, and locale tags
+unchanged.
 
 ## Pull request checklist
 
 - [ ] The change has one clear purpose.
-- [ ] I documented user-visible behavior and limitations.
-- [ ] I verified links, commands, or tests affected by the change.
-- [ ] I documented the source and license of new external assets.
+- [ ] I documented user-visible behavior, camera limits, and failure cases.
+- [ ] I verified links, commands, tests, or artifacts affected by the change.
+- [ ] I documented the source and license of new external assets or weights.
+- [ ] Generated content remains distinguishable from observed input.
 - [ ] I updated translations or identified which ones need follow-up.

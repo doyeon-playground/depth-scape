@@ -2,97 +2,112 @@
 
 ## Summary
 
-ScenePort turns visual captures into interactive 3D scenes. It begins with a
-single photo, progresses to video-based reconstruction, and ultimately targets
-camera-connected spatial capture.
+DepthScape turns one landscape photograph into an explorable 2.5D scene. It
+combines relative-depth estimation, image layering, constrained inpainting, and
+a limited-parallax viewer to create a spatial impression from a flat image.
 
 ## Problem
 
-Photos and videos preserve appearance but are usually consumed as flat media.
-Existing 3D reconstruction workflows can require specialized capture rigs,
-careful multi-view acquisition, expert tools, or long processing pipelines.
-ScenePort explores a simpler path from familiar visual inputs to an explorable
-spatial result.
+A landscape photo preserves appearance from one viewpoint but cannot provide
+the visual separation that appears when an observer moves. A full 3D
+reconstruction cannot be recovered from one image because hidden surfaces were
+never captured. DepthScape therefore targets a smaller and more honest result:
+a controlled 2.5D experience that generates only the small hidden regions
+revealed by limited camera motion.
 
 ## Product principles
 
-- **Progressive capability:** photo first, video second, live camera third.
-- **Honest output:** distinguish inferred geometry from observed geometry.
-- **Fast feedback:** show intermediate artifacts such as the source image and
-  depth map instead of hiding the pipeline.
-- **Portable results:** prefer documented, interoperable scene formats.
-- **Accessible interaction:** the first useful result should open in a web
-  browser without requiring a 3D authoring tool.
-- **Privacy by design:** document where inputs are processed and stored before
-  any hosted workflow is introduced.
+- **Honest synthesis:** always distinguish observed pixels from generated
+  pixels and avoid calling generated content a reconstruction of reality.
+- **Constrained motion:** limit the camera before expanding or inventing large
+  unseen regions.
+- **Depth coherence:** prioritize stable layer boundaries and plausible
+  occlusion over dramatic movement.
+- **Reproducibility:** record input transforms, model identifiers, parameters,
+  and artifact relationships.
+- **Inspectable pipeline:** expose source, depth, masks, and generated-region
+  previews where useful.
+- **Local-first privacy:** process user images locally by default and document
+  any future remote processing before it is introduced.
+- **Accessible interaction:** support keyboard operation and non-motion ways to
+  inspect the result.
 
 ## Primary users
 
-- A creator who wants to turn a landscape or room photo into an interactive
-  visual experience.
-- A developer or researcher comparing depth and reconstruction approaches.
-- A future camera user who wants immediate spatial context from a live scene.
+- A creator who wants subtle depth and parallax from a landscape photo.
+- A developer studying monocular depth, occlusion, and layered image rendering.
+- A learner who wants to inspect how depth and inpainting form a 2.5D scene.
 
-## Photo MVP user story
+## Core user story
 
-As a user, I can select a supported image, start reconstruction, inspect the
-estimated depth, and explore the generated scene in 3D so that I can understand
-both the visual result and its limitations.
+As a user, I can select a landscape photo, inspect its estimated depth and
+layers, and explore a small parallax movement so that I can experience a clear
+sense of depth without mistaking generated regions for captured reality.
 
 ## Functional scope
 
 ### Input
 
-- One local JPG or PNG image.
-- Clear validation and error messages for unsupported or corrupt inputs.
-- Explicit orientation handling so previews and reconstruction agree.
+- One local JPG or PNG landscape image.
+- Clear validation for media type, dimensions, orientation, and resource limits.
+- No automatic upload or long-term retention.
 
 ### Processing
 
-- Preprocess the image without silently changing its aspect ratio.
+- Normalize orientation without silently changing aspect ratio.
 - Estimate relative monocular depth.
-- Unproject color and depth into colored 3D points or an equivalent initial
-  representation.
-- Apply minimal cleanup that can be disabled for comparison.
+- Divide the scene into foreground, midground, and background regions using
+  depth and edge-aware rules.
+- Calculate which pixels become exposed inside the supported camera range.
+- Generate only the required background color and depth behind occluders.
+- Package textures, masks, geometry, provenance, and warnings as one scene.
 
 ### Output
 
-- Show the original image and estimated depth map.
-- Render an interactive 3D scene with orbit, pan, zoom, and reset controls.
-- Label the result as inferred rather than measured geometry.
-- Report failures without losing the selected input.
+- Preview the original image, relative-depth map, and layer masks.
+- Render a bounded horizontal parallax view with reset and reduced-motion
+  behavior.
+- Provide a generated-region overlay or equivalent disclosure.
+- Report failures without losing the selected local input.
 
 ## Acceptance criteria for the first demo
 
-- A user can complete the flow with at least one documented sample image.
-- The generated scene retains recognizable colors and composition.
-- Camera controls remain usable on a current desktop browser.
-- The UI exposes processing, success, and failure states.
-- The README documents how to reproduce the demo locally.
-- No private user image is committed to the repository by default.
+- A user can complete the flow with at least one redistributable landscape
+  sample.
+- The result preserves the source composition from its default viewpoint.
+- Limited movement creates visible depth without large holes or severe edge
+  tearing in the documented sample.
+- The generated-region disclosure remains available in the viewer.
+- Camera bounds prevent the user from revealing regions outside the generated
+  support.
+- Processing, success, and failure states are accessible and localized.
+- The README documents a reproducible local workflow.
+- No private image, model weight, or generated scene is committed by default.
 
-## Non-goals for the photo MVP
+## Non-goals
 
-- Recovering geometry behind visible surfaces.
-- Guaranteeing metric depth or survey-grade accuracy.
-- Reconstructing every image category equally well.
-- Real-time processing.
-- Collaborative editing, user accounts, or cloud synchronization.
-- Production deployment or long-term storage of uploads.
+- Recovering the true content behind visible objects.
+- Full 3D geometry or free-orbit navigation.
+- Metric depth or survey-grade accuracy.
+- Indoor, portrait, object-centric, video, or live-camera workflows.
+- Real-time capture, user accounts, cloud synchronization, or hosted storage.
+- Training a large foundation model during the initial milestone.
 
 ## Risks and open questions
 
-- Depth discontinuities may stretch foreground colors into the background.
-- Sky, reflections, transparency, and textureless regions can produce unstable
-  geometry.
-- Large inputs may exceed practical memory or latency limits.
-- The first 3D representation and export format still need an experiment-led
-  decision.
-- Model license, model size, hardware support, and local-versus-server inference
-  must be evaluated before implementation is locked.
+- Thin structures, sky boundaries, reflections, transparency, and textureless
+  regions may create unstable depth or masks.
+- RGB inpainting alone does not provide coherent hidden depth; the completion
+  strategy must generate or infer both.
+- Larger camera motion rapidly increases invented content and edge artifacts.
+- Existing model weights may have licenses that restrict redistribution or
+  commercial use.
+- Browser rendering capability and local inference performance will vary.
+- The initial layered representation and export contract still require a
+  measured experiment.
 
-## Success signals
+## Success signal
 
-The first milestone is successful when a new contributor can run the documented
-flow, generate a recognizable scene from a sample photo, inspect its depth map,
-and explain the result's limitations.
+The first milestone succeeds when a new contributor can reproduce a landscape
+demo, inspect every generated artifact, distinguish observed from synthesized
+content, and explore the result within a safe camera range.
