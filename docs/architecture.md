@@ -18,16 +18,16 @@ Validation and orientation normalization
 Relative-depth estimation
     |
     v
-Edge-aware foreground / midground / background layers
+Continuous relative-depth mesh with depth-edge cuts
     |
     v
-Camera bounds and disocclusion masks
+Z-buffered camera bounds and disocclusion masks
     |
     v
 Hidden RGB and depth completion
     |
     v
-Layered scene package with provenance
+Mesh scene package with provenance
     |
     v
 Local Python limited-parallax viewer
@@ -51,30 +51,36 @@ Local Python limited-parallax viewer
 - Records model identifier, version, weight checksum where practical, and
   license notes.
 
-### Layer builder
+### Geometry builder
 
-- Combines relative depth with image edges to derive ordered scene layers.
+- Combines aligned source coordinates with continuous relative depth.
 - Keeps masks pixel-aligned with the normalized source image.
-- Identifies thin structures and ambiguous edges as explicit diagnostics.
+- Cuts mesh connectivity at sharp depth changes without semantic classes.
+- Identifies cut cells, thin structures, and ambiguous edges as diagnostics.
 - Produces observed-region masks before any generated content is introduced.
 
-The provisional baseline first smooths relative depth inside low-edge regions,
-preserves strong RGB or depth discontinuities, and clusters the result into
-three ordered depth groups. It validates the source hash and normalized
-dimensions against the producing depth run before processing.
+The candidate scene baseline samples an aspect-correct image plane, assigns the
+aligned unitless relative proximity to each vertex's Z coordinate, and omits
+triangles from cells containing a local depth jump above the configured
+threshold. The normalized observed RGB texture is stored separately and remains
+pixel-identical to the input at the source viewpoint.
 
 | Artifact | Current contract |
 | --- | --- |
-| `layer-depth.npy` | float32 HxW edge-refined relative depth in `[0, 1]` |
-| `boundary-strength.npy` | float32 HxW RGB/depth edge union in `[0, 1]` |
-| `layer-map.npy` | uint8 HxW; `0=background`, `1=midground`, `2=foreground` |
-| `*-mask.png` | uint8 HxW; `255=included`, `0=excluded` |
-| `layer-preview.png` | RGB diagnostic palette; display only |
-| `layers.json` | hashes, coordinate convention, parameters, results, and warnings |
+| `observed-texture.png` | uint8 RGB HxW normalized source pixels |
+| `mesh-vertices.npy` | float32 Nx3 aspect-correct X/Y and relative-proximity Z |
+| `mesh-uv.npy` | float32 Nx2 top-left-origin UV coordinates |
+| `mesh-faces.npy` | int32 Mx3 retained triangle indices |
+| `mesh-sample-*.npy` | int32 source coordinates sampled by mesh rows and columns |
+| `mesh-cut-cells.png` | uint8 mesh-cell grid; `255=cut`, `0=retained` |
+| `mesh-preview.png` | source RGB with cut footprints overlaid red; display only |
+| `mesh.json` | hashes, coordinate convention, parameters, results, and warnings |
 
-The three masks are mutually exclusive and exhaustive. Their labels express
-relative ordering only; they do not identify objects, metric ranges, or hidden
-surfaces. Per-pixel data remains in binary artifacts rather than JSON.
+The previous edge-preserving three-cluster layer builder remains available as a
+comparison baseline. Its labels express relative ordering only; they do not
+identify objects, metric ranges, or hidden surfaces. It is not the final scene
+geometry contract. Per-pixel and per-mesh data remains in binary artifacts
+rather than JSON.
 
 ### Visibility planner
 
@@ -83,12 +89,13 @@ surfaces. Per-pixel data remains in binary artifacts rather than JSON.
 - Requests completion only for the union of required disocclusion regions.
 - Rejects or clamps camera movement outside generated coverage.
 
-The provisional planner uses discrete horizontal layer translation rather than
-a physical camera. Camera position is normalized to `[-1, 1]`, where `0`
-preserves the source composition. Background remains fixed; midground moves at
-half the foreground displacement. The default foreground limit is 2% of image
-width with a 64-pixel cap. Every integer foreground shift in that range is
-evaluated.
+The implemented comparison planner uses discrete horizontal layer translation
+rather than a physical camera. Camera position is normalized to `[-1, 1]`,
+where `0` preserves the source composition. Background remains fixed;
+midground moves at half the foreground displacement. The default foreground
+limit is 2% of image width with a 64-pixel cap. Every integer foreground shift
+in that range is evaluated. These masks are not compatible with the continuous
+mesh.
 
 | Artifact | Current contract |
 | --- | --- |
@@ -100,9 +107,9 @@ evaluated.
 | `disocclusion-preview.png` | Fixed-palette target-layer diagnostic; display only |
 | `camera-plan.json` | Bounds, shifts, hashes, pixel counts, timing, and warnings |
 
-All masks are uint8 PNG files with `255=included` and `0=excluded`. Completion
-must run independently for each target layer even where their required regions
-overlap.
+All comparison masks are uint8 PNG files with `255=included` and `0=excluded`.
+The next geometry experiment must replace them with z-buffered mesh visibility
+and prove the source view before completion begins.
 
 ### Completion adapters
 
@@ -113,7 +120,7 @@ overlap.
 
 ### Scene packager
 
-- Packages source-derived textures, generated textures, depth, masks, layers,
+- Packages source-derived textures, generated textures, depth, masks, mesh geometry,
   camera bounds, warnings, and compact metadata.
 - Keeps large arrays and images in binary artifacts rather than embedding them
   in JSON.
@@ -135,13 +142,15 @@ a network service, account, browser runtime, or retained upload.
 
 ## Scene representation
 
-A Layered Depth Image is the initial conceptual representation: multiple color,
-depth, and mask layers viewed from a constrained camera. The first experiment
-may use textured planes or a small depth mesh as long as the boundaries above
-remain explicit.
+The candidate representation is a continuous image-textured depth mesh with
+connectivity removed at sharp relative-depth discontinuities. It uses no fixed
+semantic layer count. Observed texture, inferred geometry, future generated
+coverage, and provenance remain separate artifacts viewed from a constrained
+camera.
 
-The coordinate system, depth normalization, layer ordering, and camera limits
-must be documented before artifacts are treated as compatible.
+The coordinate system, depth normalization, face topology, renderer transform,
+and camera limits must be documented before artifacts are treated as
+compatible.
 
 ## Compact manifest
 
@@ -162,13 +171,14 @@ point arrays, or image bytes.
     "inpainting": "candidate@version"
   },
   "scene": {
-    "representation": "layered-depth-image",
+    "representation": "cut-continuous-depth-mesh",
     "depthType": "relative",
     "cameraRange": { "horizontal": 0.0 }
   },
   "artifacts": {
     "depth": "depth.bin",
-    "layers": "layers.bin",
+    "vertices": "mesh-vertices.npy",
+    "faces": "mesh-faces.npy",
     "provenanceMask": "provenance.png"
   },
   "warnings": []
@@ -183,7 +193,7 @@ The final binary formats and coordinate values remain experimental.
 - Every generated pixel is distinguishable from observed input in provenance
   data.
 - RGB, depth, and masks share an explicit alignment transform.
-- Layer ordering is deterministic for a fixed input and configuration.
+- Mesh sampling and topology are deterministic for a fixed input and configuration.
 - Camera bounds never exceed generated color and depth coverage.
 - Model failures are explicit and never silently replaced with plausible output.
 - User media does not become a fixture, log payload, or committed artifact.
@@ -194,7 +204,7 @@ The final binary formats and coordinate values remain experimental.
   reality.
 - **Reproducibility:** versions, configuration, seeds, and transforms are
   recorded.
-- **Coherence:** color completion, depth completion, masks, and layer order agree.
+- **Coherence:** color completion, depth completion, masks, and mesh visibility agree.
 - **Portability:** model- and hardware-specific implementations remain isolated.
 - **Privacy:** processing is local by default and retention is minimized.
 - **Accessibility:** motion is optional and all controls have keyboard paths.

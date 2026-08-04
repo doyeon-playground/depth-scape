@@ -3,9 +3,9 @@
 ## Summary
 
 DepthScape turns one landscape photograph into an explorable 2.5D scene. It
-combines relative-depth estimation, image layering, constrained inpainting, and
-a local Python parallax viewer to create a spatial impression from a flat
-image.
+combines relative-depth estimation, depth-aware mesh geometry, constrained
+inpainting, and a local Python parallax viewer to create a spatial impression
+from a flat image.
 
 ## Problem
 
@@ -22,7 +22,7 @@ revealed by limited camera motion.
   pixels and avoid calling generated content a reconstruction of reality.
 - **Constrained motion:** limit the camera before expanding or inventing large
   unseen regions.
-- **Depth coherence:** prioritize stable layer boundaries and plausible
+- **Depth coherence:** prioritize stable geometry boundaries and plausible
   occlusion over dramatic movement.
 - **Reproducibility:** record input transforms, model identifiers, parameters,
   and artifact relationships.
@@ -36,14 +36,15 @@ revealed by limited camera motion.
 ## Primary users
 
 - A creator who wants subtle depth and parallax from a landscape photo.
-- A developer studying monocular depth, occlusion, and layered image rendering.
+- A developer studying monocular depth, occlusion, and image-textured mesh rendering.
 - A learner who wants to inspect how depth and inpainting form a 2.5D scene.
 
 ## Core user story
 
 As a user, I can select a landscape photo, inspect its estimated depth and
-layers, and explore a small parallax movement so that I can experience a clear
-sense of depth without mistaking generated regions for captured reality.
+geometry boundaries, and explore a small parallax movement so that I can
+experience a clear sense of depth without mistaking generated regions for
+captured reality.
 
 ## Functional scope
 
@@ -57,15 +58,15 @@ sense of depth without mistaking generated regions for captured reality.
 
 - Normalize orientation without silently changing aspect ratio.
 - Estimate relative monocular depth.
-- Divide the scene into foreground, midground, and background regions using
-  depth and edge-aware rules.
+- Build a continuous image-textured mesh and cut connectivity at sharp
+  relative-depth discontinuities without fixed semantic classes.
 - Calculate which pixels become exposed inside the supported camera range.
-- Generate only the required background color and depth behind occluders.
+- Generate only the required hidden color and depth behind occluders.
 - Package textures, masks, geometry, provenance, and warnings as one scene.
 
 ### Output
 
-- Preview the original image, relative-depth map, and layer masks.
+- Preview the original image, relative-depth map, and mesh-cut diagnostics.
 - Render a bounded horizontal parallax view in a local Python application with
   reset and reduced-motion behavior.
 - Provide a generated-region overlay or equivalent disclosure.
@@ -106,8 +107,8 @@ sense of depth without mistaking generated regions for captured reality.
   commercial use.
 - Desktop graphics capability, packaging behavior, and local inference
   performance will vary across supported Python environments.
-- The initial layered representation and export contract still require a
-  measured experiment.
+- The continuous-mesh rendering transform and export contract still require a
+  measured camera experiment.
 
 ## Success signal
 

@@ -10,7 +10,7 @@ cases.
 - Verify candidate model source, version, weight license, and hardware needs.
 - Select small, redistributable landscape samples with difficult edge cases.
 - Define observed, inferred, and generated pixel provenance.
-- Document image, depth, mask, layer, and camera coordinate conventions.
+- Document image, depth, mask, geometry, and camera coordinate conventions.
 - Establish a reproducible local or Colab experiment workflow.
 
 **Exit condition:** one documented command or notebook produces a depth map from
@@ -27,13 +27,14 @@ a sample image and records all configuration needed to repeat the result.
 **Exit condition:** the same input and configuration produce structurally
 consistent depth artifacts across repeated runs on a supported environment.
 
-## Phase 2: Layer and occlusion construction
+## Phase 2: Geometry and occlusion construction
 
-- Derive foreground, midground, and background masks from depth and edges.
-- Preserve thin structures where practical.
+- Build a continuous image-textured mesh from relative depth.
+- Cut connectivity at likely depth discontinuities without semantic classes.
+- Preserve thin structures and gradual relief where practical.
 - Define a bounded horizontal camera range.
-- Calculate disocclusion masks for that camera range.
-- Build a Layered Depth Image or equivalent inspectable representation.
+- Calculate z-buffered disocclusion masks for that camera range.
+- Keep observed RGB separate from inferred geometry and generated content.
 
 **Exit condition:** moving the virtual camera exposes known hole masks while the
 default viewpoint still matches the source composition.
@@ -53,9 +54,9 @@ identified.
 
 ## Phase 4: Local Python viewer
 
-- Package textures, masks, layers, camera bounds, and metadata as a scene.
+- Package textures, masks, mesh geometry, camera bounds, and metadata as a scene.
 - Add horizontal parallax, reset, reduced-motion, and keyboard controls.
-- Add source, depth, layer, and generated-region inspection modes.
+- Add source, depth, mesh-cut, and generated-region inspection modes.
 - Localize the user-facing workflow in supported languages.
 - Select the smallest suitable Python GUI/rendering toolkit through a measured
   prototype.

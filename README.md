@@ -3,9 +3,9 @@
 **Turn a landscape photo into an explorable 2.5D scene.**
 
 DepthScape is an open-source project that transforms one landscape photo into a
-layered, depth-aware scene. It estimates relative depth, separates the image
-into foreground, midground, and background layers, fills small regions hidden
-behind foreground objects, and renders a controlled parallax view in a local
+depth-aware scene. It estimates continuous relative depth, cuts mesh
+connectivity at likely occlusion boundaries, fills only the small regions
+revealed by camera motion, and renders a controlled parallax view in a local
 Python application.
 
 > [!IMPORTANT]
@@ -28,10 +28,11 @@ English is the source language for the project and its documentation.
 ```text
 Landscape photo
     -> relative depth map
-    -> foreground, midground, and background layers
-    -> occlusion and hole masks
-    -> background image and depth completion
-    -> layered 2.5D scene
+    -> continuous image-textured depth mesh
+    -> depth-discontinuity cuts
+    -> bounded-camera hole masks
+    -> hidden RGB and depth completion
+    -> provenance-aware 2.5D scene
     -> local Python parallax viewer
 ```
 
@@ -58,8 +59,8 @@ The first release will:
 
 - accept one local JPG or PNG landscape image;
 - preserve its orientation and aspect ratio;
-- preview relative depth and layer masks;
-- generate only the background regions needed for the allowed camera motion;
+- preview relative depth and depth-boundary cuts without hiding source RGB;
+- generate only the hidden regions needed for the allowed camera motion;
 - distinguish observed pixels from generated pixels;
 - render a keyboard-accessible, limited parallax view; and
 - retain enough configuration metadata to reproduce the result.
@@ -71,11 +72,11 @@ reconstruction are also outside the project scope.
 ## Project status
 
 DepthScape is currently in the **baseline-evaluation** stage. Reproducible
-relative-depth, three-layer, and bounded-camera planning pipelines are
-available, but their artifact schemas and model choices remain experimental
-until the landscape failure set is evaluated.
+relative-depth, three-layer comparison, bounded layer-camera, and cut
+continuous-mesh pipelines are available. The next experiment will evaluate the
+mesh through a bounded Python renderer before any hidden-content completion.
 
-## Try the depth and layer baselines
+## Try the depth and mesh baselines
 
 The baseline validates one JPG or PNG, applies its EXIF orientation, runs the
 pinned Depth Anything V2 Small checkpoint, and writes an aligned float32 depth
@@ -85,6 +86,11 @@ artifact, an 8-bit preview, and a JSON run record.
 python -m pip install -e ".[depth]"
 python samples/create_demo_landscape.py demo-landscape.png
 depth-scape-depth demo-landscape.png --output-dir runs/demo
+depth-scape-mesh demo-landscape.png \
+  --depth-run-dir runs/demo \
+  --output-dir runs/demo-mesh
+
+# Optional comparison with the earlier three-layer baseline
 depth-scape-layers demo-landscape.png \
   --depth-run-dir runs/demo \
   --output-dir runs/demo-layers
@@ -98,19 +104,24 @@ otherwise the command follows a slower CPU-safe path. Input images stay on the
 machine running the command. The numeric output is unitless relative proximity,
 where larger values mean nearer content; it is not metric depth.
 
-The layer command validates that the depth run belongs to the same normalized
-image, combines RGB and depth discontinuities, and exports exhaustive
-background, midground, and foreground masks. These are inferred relative-depth
-groups, not semantic segmentation or metric distance bands. See
-[experiment 0002](docs/experiments/0002-layer-baseline.md) for the artifact
-contract and the first landscape observation.
+The mesh command validates that the depth run belongs to the same normalized
+image, samples an aspect-correct continuous surface, and removes triangle
+connectivity from cells containing sharp local depth jumps. It exports the
+pixel-identical observed texture separately from inferred geometry and renders
+an RGB-preserving cut diagnostic. It does not classify sky, terrain, or other
+semantic content. See [experiment 0004](docs/experiments/0004-continuous-depth-mesh.md)
+for the artifact contract and first landscape observation.
+
+The layer and planning commands remain available as reproducible comparison
+baselines. Their fixed three-band camera and completion masks are not the final
+mesh scene contract.
 
 The planning command keeps the background fixed, moves the midground at half
 the foreground displacement, and inspects every integer foreground shift in a
 bounded range. It writes the per-layer regions that require hidden-content
 completion, endpoint hole diagnostics, and `camera-plan.json`. This is a
-pixel-space motion contract for the future Python viewer, not a physical camera
-model.
+pixel-space comparison contract for the superseded three-layer geometry, not a
+physical camera model or the new mesh camera plan.
 
 For a hosted experiment, open the
 [Depth baseline notebook](notebooks/0001_depth_baseline.ipynb) in Colab. A Colab
@@ -127,8 +138,10 @@ for the exact model revision, weight digest, artifact contract, and known risks.
 - [Depth baseline experiment](docs/experiments/0001-depth-baseline.md)
 - [Layer baseline experiment](docs/experiments/0002-layer-baseline.md)
 - [Camera and disocclusion experiment](docs/experiments/0003-disocclusion-planner.md)
+- [Continuous-depth mesh experiment](docs/experiments/0004-continuous-depth-mesh.md)
 - [Scope decision](docs/decisions/0001-focus-on-landscape-2-5d.md)
 - [Python viewer decision](docs/decisions/0002-use-local-python-viewer.md)
+- [Continuous-depth mesh decision](docs/decisions/0003-use-cut-continuous-depth-mesh.md)
 - [Internationalization](docs/i18n.md)
 - [Contributing](CONTRIBUTING.md)
 
@@ -137,7 +150,7 @@ for the exact model revision, weight digest, artifact contract, and known risks.
 ```text
 depth-scape/
 |-- viewer/         # Local Python workflow and limited-parallax viewer
-|-- pipeline/       # Depth, layers, inpainting, and scene packaging
+|-- pipeline/       # Depth, geometry, inpainting, and scene packaging
 |-- samples/        # Small, redistributable landscape inputs
 |-- tests/          # Numeric and pipeline-boundary verification
 |-- docs/           # Product and engineering documentation

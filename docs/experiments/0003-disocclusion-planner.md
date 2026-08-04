@@ -1,6 +1,6 @@
 # 0003: Bounded camera and disocclusion planner
 
-- **Status:** Implementation ready; completion experiment pending
+- **Status:** Reproducible comparison baseline; not compatible with mesh geometry
 - **Date:** 2026-08-04
 - **Owner:** DepthScape
 
@@ -107,7 +107,7 @@ completion quality will therefore depend on boundary refinement and padding.
 
 ## Current decision
 
-Keep this plan as the provisional camera contract for the local Python viewer.
-The next experiment should complete background RGB and hidden depth separately
-inside the two target-layer masks, preserve a generated-pixel provenance mask,
-and compare seams at both camera endpoints.
+Keep this plan as a reproducible comparison for discrete three-layer motion.
+Experiment 0004 changes the candidate scene representation to a cut continuous
+mesh, so these masks must not drive its hidden-content completion. A new
+z-buffered camera experiment must derive mesh-specific visibility first.

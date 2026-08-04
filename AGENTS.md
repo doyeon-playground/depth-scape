@@ -4,10 +4,10 @@ This file applies to the entire repository.
 
 ## Product intent
 
-`depth-scape` transforms one landscape photo into a layered, explorable 2.5D
-scene. It estimates relative depth, separates foreground, midground, and
-background, generates only the small hidden regions revealed by bounded camera
-motion, and preserves provenance for generated content.
+`depth-scape` transforms one landscape photo into an explorable 2.5D scene. It
+estimates relative depth, builds image-textured continuous geometry with cuts at
+likely depth discontinuities, generates only the small hidden regions revealed
+by bounded camera motion, and preserves provenance for generated content.
 
 Optimize work in this order:
 
@@ -127,6 +127,11 @@ Every behavior change should have proportional verification.
   convention once established.
 
 ## Documentation
+
+- Defer implementation documentation to one focused pass immediately before
+  merge instead of updating it throughout development.
+- Do not create or update i18n documentation or translations unless the user
+  explicitly requests localization work.
 
 Update documentation in the same change when modifying:
 

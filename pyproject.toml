@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "depth-scape"
 version = "0.1.0"
-description = "Turn a landscape photo into an explorable layered 2.5D scene."
+description = "Turn a landscape photo into an explorable depth-aware 2.5D scene."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = "MIT"
@@ -24,6 +24,7 @@ depth = [
 [project.scripts]
 depth-scape-depth = "depth_scape.cli:main"
 depth-scape-layers = "depth_scape.layers_cli:main"
+depth-scape-mesh = "depth_scape.mesh_cli:main"
 depth-scape-plan = "depth_scape.visibility_cli:main"
 
 [tool.setuptools]

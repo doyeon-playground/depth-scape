@@ -1,6 +1,6 @@
 # 0002: Three-layer construction baseline
 
-- **Status:** Implementation ready; broader failure-set evaluation pending
+- **Status:** Reproducible comparison baseline; superseded for scene geometry
 - **Date:** 2026-08-04
 - **Owner:** DepthScape
 
@@ -127,7 +127,7 @@ planning, not as a final object-aware layer decomposition.
 
 ## Current decision
 
-Keep this algorithm as the provisional Phase 2 layer baseline. The next
-experiment should define a bounded horizontal camera motion and derive explicit
-disocclusion masks from these ordered layers. Revisit the layer algorithm only
-when that motion experiment exposes a repeatable boundary or ordering failure.
+Keep this algorithm as a reproducible comparison baseline. Experiment 0004
+replaces the fixed three-band representation with a cut continuous-depth mesh
+for candidate scene geometry. No semantic meaning should be added to these
+historical labels.

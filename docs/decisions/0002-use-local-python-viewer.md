@@ -18,8 +18,8 @@ geometry and completion contracts are stable.
 
 Build the final interactive viewer as a local Python application. The viewer
 will consume the same versioned scene artifacts as the command-line pipeline,
-enforce the recorded horizontal camera bounds, and expose source, depth, layer,
-and generated-region inspection modes.
+enforce the recorded horizontal camera bounds, and expose source, depth,
+geometry, and generated-region inspection modes.
 
 The GUI and rendering toolkit will be selected through a small measured
 prototype after scene packaging is stable. This decision chooses Python, not a
