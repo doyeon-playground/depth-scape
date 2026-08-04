@@ -60,9 +60,12 @@ Local Python limited-parallax viewer
 - Produces observed-region masks before any generated content is introduced.
 
 The candidate scene baseline samples an aspect-correct image plane, assigns the
-aligned unitless relative proximity to each vertex's Z coordinate, and omits
-triangles from cells containing a local depth jump above the configured
-threshold. The normalized observed RGB texture is stored separately and remains
+aligned unitless relative proximity to each vertex's Z coordinate, and detects
+base-grid cells containing a local depth jump above the configured threshold.
+Each detected cell is subdivided at source-pixel resolution. Only residual
+pixel-scale cells that still cross the threshold lose their triangles. This
+keeps both sides of a boundary represented without globally increasing mesh
+density. The normalized observed RGB texture is stored separately and remains
 pixel-identical to the input at the source viewpoint.
 
 | Artifact | Current contract |
@@ -72,8 +75,8 @@ pixel-identical to the input at the source viewpoint.
 | `mesh-uv.npy` | float32 Nx2 top-left-origin UV coordinates |
 | `mesh-faces.npy` | int32 Mx3 retained triangle indices |
 | `mesh-sample-*.npy` | int32 source coordinates sampled by mesh rows and columns |
-| `mesh-cut-cells.png` | uint8 mesh-cell grid; `255=cut`, `0=retained` |
-| `mesh-preview.png` | source RGB with cut footprints overlaid red; display only |
+| `mesh-cut-cells.png` | uint8 base-cell diagnostic; `255=refined boundary cell`, `0=unchanged` |
+| `mesh-preview.png` | source RGB with residual pixel-scale cuts overlaid red; display only |
 | `mesh.json` | hashes, coordinate convention, parameters, results, and warnings |
 
 The previous edge-preserving three-cluster layer builder remains available as a
@@ -89,27 +92,41 @@ rather than JSON.
 - Requests completion only for the union of required disocclusion regions.
 - Rejects or clamps camera movement outside generated coverage.
 
-The implemented comparison planner uses discrete horizontal layer translation
-rather than a physical camera. Camera position is normalized to `[-1, 1]`,
-where `0` preserves the source composition. Background remains fixed;
-midground moves at half the foreground displacement. The default foreground
-limit is 2% of image width with a 64-pixel cap. Every integer foreground shift
-in that range is evaluated. These masks are not compatible with the continuous
-mesh.
+The implemented mesh baseline safely loads and validates a complete mesh run,
+then rasterizes it with an orthographic CPU z-buffer. Larger relative Z values
+win the depth test because they represent nearer content. Camera position is
+normalized to `[-1, 1]`, where `0` is the observed source composition. The
+default samples are `-1`, `0`, and `1`, with a maximum horizontal displacement
+of 2% of render width capped at 64 render pixels. Render output is limited to
+512 pixels on its longest side by default.
+
+The center image is copied from the normalized observed texture at render
+resolution rather than synthesized by geometry. A separate center geometry
+mask discloses any rasterization gaps at the source viewpoint. Endpoint and
+union masks identify missing viewport pixels for the finite sampled positions;
+they are not yet source-space hidden texture requests and do not prove coverage
+at every continuous camera position.
 
 | Artifact | Current contract |
 | --- | --- |
-| `background-disocclusion-mask.png` | Background source-grid pixels needed behind nearer layers |
-| `midground-disocclusion-mask.png` | Midground source-grid pixels needed behind foreground |
-| `all-view-holes.png` | Viewport pixels exposed at any supported position before completion |
+| `center-view.png` | Observed RGB resized to render resolution; no generated pixels |
+| `left-view.png` | Z-buffered mesh RGB at camera position `-1`; missing pixels are black |
+| `right-view.png` | Z-buffered mesh RGB at camera position `+1`; missing pixels are black |
+| `center-geometry-holes.png` | Source-view rasterization gaps; `255=missing` |
 | `left-view-holes.png` | Missing viewport pixels at camera position `-1` |
 | `right-view-holes.png` | Missing viewport pixels at camera position `+1` |
-| `disocclusion-preview.png` | Fixed-palette target-layer diagnostic; display only |
-| `camera-plan.json` | Bounds, shifts, hashes, pixel counts, timing, and warnings |
+| `all-view-holes.png` | Union of holes at sampled non-default positions |
+| `mesh-camera.json` | Validated inputs, camera bounds, hashes, counts, timings, and warnings |
 
-All comparison masks are uint8 PNG files with `255=included` and `0=excluded`.
-The next geometry experiment must replace them with z-buffered mesh visibility
-and prove the source view before completion begins.
+All masks are uint8 PNG files with `255=missing` and `0=covered`. The CPU
+rasterizer is a deterministic accuracy baseline, not the selected interactive
+renderer. Completion must remain separate until viewport holes are converted
+into a coherent far-surface color-and-depth contract.
+
+The earlier three-layer planner remains available only as a reproducible
+comparison. It uses discrete layer translation with fixed background,
+midground, and foreground behavior; its masks are incompatible with the
+continuous mesh and must not be used for completion.
 
 ### Completion adapters
 
@@ -143,10 +160,10 @@ a network service, account, browser runtime, or retained upload.
 ## Scene representation
 
 The candidate representation is a continuous image-textured depth mesh with
-connectivity removed at sharp relative-depth discontinuities. It uses no fixed
-semantic layer count. Observed texture, inferred geometry, future generated
-coverage, and provenance remain separate artifacts viewed from a constrained
-camera.
+adaptive connectivity cuts at sharp relative-depth discontinuities. It uses no
+fixed semantic layer count. Observed texture, inferred geometry, measured
+viewport holes, future generated coverage, and provenance remain separate
+artifacts viewed from a constrained camera.
 
 The coordinate system, depth normalization, face topology, renderer transform,
 and camera limits must be documented before artifacts are treated as

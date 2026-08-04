@@ -1,6 +1,6 @@
 # 0004: Cut continuous-depth mesh baseline
 
-- **Status:** Geometry artifacts ready; rendered camera evaluation pending
+- **Status:** Original geometry baseline complete; refined by experiment 0005
 - **Date:** 2026-08-04
 - **Owner:** DepthScape
 
@@ -123,7 +123,9 @@ rule. This is a geometry diagnostic, not yet proof of a correct rendered view.
 
 ## Current decision
 
-Continue with a small z-buffered Python rendering experiment using this mesh.
-The next experiment must prove source-view preservation, measure holes at a
-bounded horizontal camera range, and compare seams with and without depth-edge
-cuts. Hidden-content completion remains paused until those measurements exist.
+Experiment 0005 completed the z-buffered camera evaluation and found that
+whole-cell removal created unnecessarily broad gaps. The accepted follow-up
+refines only detected boundary cells at source-pixel resolution while retaining
+this original behavior as a reproducible comparison. Hidden-content completion
+remains paused until viewport holes have a coherent far-surface RGB and depth
+contract.

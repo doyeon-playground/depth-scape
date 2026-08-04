@@ -4,6 +4,16 @@ This roadmap describes outcomes, not fixed release dates. DepthScape advances
 only when each phase produces a reproducible result with documented failure
 cases.
 
+## Current position
+
+The Phase 2 baseline now builds an adaptively cut continuous-depth mesh and
+measures its coverage at three bounded horizontal camera positions with a CPU
+z-buffer. On the current local mountain evaluation, the default viewpoint
+preserves the source composition through the separate observed texture, while
+geometry-only gaps are disclosed explicitly. Before Phase 3 begins, the finite
+viewport-space hole masks must be converted into coherent far-surface RGB and
+depth completion requests and checked across the continuous camera range.
+
 ## Phase 0: Scope and baselines
 
 - Fix the product boundary at one landscape photo and limited 2.5D motion.
@@ -34,6 +44,8 @@ consistent depth artifacts across repeated runs on a supported environment.
 - Preserve thin structures and gradual relief where practical.
 - Define a bounded horizontal camera range.
 - Calculate z-buffered disocclusion masks for that camera range.
+- Refine depth-boundary geometry locally instead of discarding broad coarse
+  cells.
 - Keep observed RGB separate from inferred geometry and generated content.
 
 **Exit condition:** moving the virtual camera exposes known hole masks while the

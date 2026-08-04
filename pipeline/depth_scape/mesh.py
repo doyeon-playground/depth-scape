@@ -19,6 +19,8 @@ class MeshBuildConfig:
 
     max_mesh_dimension: int = 384
     depth_jump_threshold: float = 0.02
+    refine_depth_boundaries: bool = True
+    max_refined_source_cells: int = 2_000_000
     preview_overlay_alpha: float = 0.65
 
 
@@ -42,6 +44,9 @@ class MeshBuildResult:
     cut_source_mask: np.ndarray
     sampling_stride: int
     retained_face_fraction: float
+    refined_base_cell_count: int
+    refined_source_cell_count: int
+    residual_cut_source_cell_count: int
 
 
 def _validate_config(config: MeshBuildConfig) -> None:
@@ -57,6 +62,14 @@ def _validate_config(config: MeshBuildConfig) -> None:
         or config.depth_jump_threshold > 1.0
     ):
         raise MeshContractError("depth_jump_threshold must be finite and in (0, 1]")
+    if not isinstance(config.refine_depth_boundaries, bool):
+        raise MeshContractError("refine_depth_boundaries must be a boolean")
+    if (
+        isinstance(config.max_refined_source_cells, bool)
+        or config.max_refined_source_cells < 1
+        or config.max_refined_source_cells > 20_000_000
+    ):
+        raise MeshContractError("max_refined_source_cells must be between 1 and 20000000")
     if (
         not math.isfinite(config.preview_overlay_alpha)
         or config.preview_overlay_alpha <= 0.0
@@ -125,27 +138,33 @@ def _cut_cells_from_jumps(
     return np.ascontiguousarray(counts > 0)
 
 
-def _source_mask_from_cut_cells(
+def _add_cut_cells_to_differences(
     cut_cells: np.ndarray,
     *,
     sample_x: np.ndarray,
     sample_y: np.ndarray,
-    height: int,
-    width: int,
-) -> np.ndarray:
+    differences: np.ndarray,
+) -> None:
     if not cut_cells.any():
-        return np.zeros((height, width), dtype=np.bool_)
+        return
 
     cell_y, cell_x = np.nonzero(cut_cells)
     top = sample_y[cell_y]
     bottom = sample_y[cell_y + 1] + 1
     left = sample_x[cell_x]
     right = sample_x[cell_x + 1] + 1
-    differences = np.zeros((height + 1, width + 1), dtype=np.int32)
     np.add.at(differences, (top, left), 1)
     np.add.at(differences, (bottom, left), -1)
     np.add.at(differences, (top, right), -1)
     np.add.at(differences, (bottom, right), 1)
+
+
+def _source_mask_from_differences(
+    differences: np.ndarray,
+    *,
+    height: int,
+    width: int,
+) -> np.ndarray:
     coverage = differences.cumsum(axis=0, dtype=np.int32).cumsum(axis=1, dtype=np.int32)
     return np.ascontiguousarray(coverage[:height, :width] > 0)
 
@@ -163,6 +182,52 @@ def _build_faces(cut_cells: np.ndarray) -> np.ndarray:
     second = np.column_stack((top_left, bottom_right, top_right))
     faces = np.concatenate((first, second), axis=0).astype(np.int32, copy=False)
     return np.ascontiguousarray(faces)
+
+
+def _mesh_arrays(
+    depth: np.ndarray,
+    *,
+    sample_x: np.ndarray,
+    sample_y: np.ndarray,
+    width: int,
+    height: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    u = sample_x.astype(np.float32) / np.float32(width - 1)
+    v = sample_y.astype(np.float32) / np.float32(height - 1)
+    u_grid, v_grid = np.meshgrid(u, v)
+    sampled_depth = depth[np.ix_(sample_y, sample_x)]
+    aspect_ratio = np.float32(width / height)
+    x_grid = (u_grid - np.float32(0.5)) * np.float32(2.0) * aspect_ratio
+    y_grid = (np.float32(0.5) - v_grid) * np.float32(2.0)
+    vertices = np.column_stack((x_grid.ravel(), y_grid.ravel(), sampled_depth.ravel())).astype(
+        np.float32, copy=False
+    )
+    texture_coordinates = np.column_stack((u_grid.ravel(), v_grid.ravel())).astype(
+        np.float32, copy=False
+    )
+    return np.ascontiguousarray(vertices), np.ascontiguousarray(texture_coordinates)
+
+
+def _corner_depth_cut_cells(sampled_depth: np.ndarray, *, threshold: float) -> np.ndarray:
+    top_left = sampled_depth[:-1, :-1]
+    top_right = sampled_depth[:-1, 1:]
+    bottom_left = sampled_depth[1:, :-1]
+    bottom_right = sampled_depth[1:, 1:]
+    minimum = np.minimum(np.minimum(top_left, top_right), np.minimum(bottom_left, bottom_right))
+    maximum = np.maximum(np.maximum(top_left, top_right), np.maximum(bottom_left, bottom_right))
+    return np.ascontiguousarray(maximum - minimum > threshold)
+
+
+def _refined_source_cell_count(
+    cut_cells: np.ndarray,
+    *,
+    sample_x: np.ndarray,
+    sample_y: np.ndarray,
+) -> int:
+    cell_y, cell_x = np.nonzero(cut_cells)
+    widths = sample_x[cell_x + 1].astype(np.int64) - sample_x[cell_x].astype(np.int64)
+    heights = sample_y[cell_y + 1].astype(np.int64) - sample_y[cell_y].astype(np.int64)
+    return int(np.sum(widths * heights, dtype=np.int64))
 
 
 def build_continuous_depth_mesh(
@@ -188,18 +253,12 @@ def build_continuous_depth_mesh(
     sample_x = _sample_axis(image.width, stride=sampling_stride)
     sample_y = _sample_axis(image.height, stride=sampling_stride)
 
-    u = sample_x.astype(np.float32) / np.float32(image.width - 1)
-    v = sample_y.astype(np.float32) / np.float32(image.height - 1)
-    u_grid, v_grid = np.meshgrid(u, v)
-    sampled_depth = validated_depth[np.ix_(sample_y, sample_x)]
-    aspect_ratio = np.float32(image.width / image.height)
-    x_grid = (u_grid - np.float32(0.5)) * np.float32(2.0) * aspect_ratio
-    y_grid = (np.float32(0.5) - v_grid) * np.float32(2.0)
-    vertices = np.column_stack((x_grid.ravel(), y_grid.ravel(), sampled_depth.ravel())).astype(
-        np.float32, copy=False
-    )
-    texture_coordinates = np.column_stack((u_grid.ravel(), v_grid.ravel())).astype(
-        np.float32, copy=False
+    vertices, texture_coordinates = _mesh_arrays(
+        validated_depth,
+        sample_x=sample_x,
+        sample_y=sample_y,
+        width=image.width,
+        height=image.height,
     )
 
     jumps = _jump_pixels(validated_depth, threshold=settings.depth_jump_threshold)
@@ -208,19 +267,93 @@ def build_continuous_depth_mesh(
         sample_x=sample_x,
         sample_y=sample_y,
     )
-    faces = _build_faces(cut_cells)
+    base_faces = _build_faces(cut_cells)
+    vertex_blocks = [vertices]
+    texture_coordinate_blocks = [texture_coordinates]
+    face_blocks = [base_faces]
+    cut_differences = np.zeros((image.height + 1, image.width + 1), dtype=np.int32)
+    refined_base_cell_count = 0
+    refined_source_cell_count = 0
+    residual_cut_source_cell_count = int(np.count_nonzero(cut_cells))
+    candidate_cell_count = int(cut_cells.size)
+
+    if settings.refine_depth_boundaries and cut_cells.any():
+        refined_base_cell_count = int(np.count_nonzero(cut_cells))
+        refined_source_cell_count = _refined_source_cell_count(
+            cut_cells,
+            sample_x=sample_x,
+            sample_y=sample_y,
+        )
+        if refined_source_cell_count > settings.max_refined_source_cells:
+            raise MeshContractError(
+                "Depth-boundary refinement requires "
+                f"{refined_source_cell_count} source cells, exceeding "
+                f"max_refined_source_cells={settings.max_refined_source_cells}"
+            )
+        candidate_cell_count = int(np.count_nonzero(~cut_cells)) + refined_source_cell_count
+        residual_cut_source_cell_count = 0
+        vertex_offset = int(vertices.shape[0])
+        for cell_y, cell_x in zip(*np.nonzero(cut_cells), strict=True):
+            local_x = np.arange(
+                int(sample_x[cell_x]),
+                int(sample_x[cell_x + 1]) + 1,
+                dtype=np.int32,
+            )
+            local_y = np.arange(
+                int(sample_y[cell_y]),
+                int(sample_y[cell_y + 1]) + 1,
+                dtype=np.int32,
+            )
+            local_depth = validated_depth[np.ix_(local_y, local_x)]
+            local_cut_cells = _corner_depth_cut_cells(
+                local_depth,
+                threshold=settings.depth_jump_threshold,
+            )
+            residual_cut_source_cell_count += int(np.count_nonzero(local_cut_cells))
+            _add_cut_cells_to_differences(
+                local_cut_cells,
+                sample_x=local_x,
+                sample_y=local_y,
+                differences=cut_differences,
+            )
+            local_faces = _build_faces(local_cut_cells)
+            if local_faces.size == 0:
+                continue
+            local_vertices, local_texture_coordinates = _mesh_arrays(
+                validated_depth,
+                sample_x=local_x,
+                sample_y=local_y,
+                width=image.width,
+                height=image.height,
+            )
+            vertex_blocks.append(local_vertices)
+            texture_coordinate_blocks.append(local_texture_coordinates)
+            face_blocks.append(local_faces + np.int32(vertex_offset))
+            vertex_offset += int(local_vertices.shape[0])
+    else:
+        _add_cut_cells_to_differences(
+            cut_cells,
+            sample_x=sample_x,
+            sample_y=sample_y,
+            differences=cut_differences,
+        )
+
+    vertices = np.ascontiguousarray(np.concatenate(vertex_blocks, axis=0), dtype=np.float32)
+    texture_coordinates = np.ascontiguousarray(
+        np.concatenate(texture_coordinate_blocks, axis=0),
+        dtype=np.float32,
+    )
+    faces = np.ascontiguousarray(np.concatenate(face_blocks, axis=0), dtype=np.int32)
     if faces.size == 0:
         raise MeshContractError(
             "Depth discontinuities removed every mesh cell; increase depth_jump_threshold"
         )
-    cut_source_mask = _source_mask_from_cut_cells(
-        cut_cells,
-        sample_x=sample_x,
-        sample_y=sample_y,
+    cut_source_mask = _source_mask_from_differences(
+        cut_differences,
         height=image.height,
         width=image.width,
     )
-    retained_face_fraction = float(np.mean(~cut_cells))
+    retained_face_fraction = float(faces.shape[0] / (2 * candidate_cell_count))
     return MeshBuildResult(
         vertices=np.ascontiguousarray(vertices),
         texture_coordinates=np.ascontiguousarray(texture_coordinates),
@@ -231,6 +364,9 @@ def build_continuous_depth_mesh(
         cut_source_mask=cut_source_mask,
         sampling_stride=sampling_stride,
         retained_face_fraction=retained_face_fraction,
+        refined_base_cell_count=refined_base_cell_count,
+        refined_source_cell_count=refined_source_cell_count,
+        residual_cut_source_cell_count=residual_cut_source_cell_count,
     )
 
 

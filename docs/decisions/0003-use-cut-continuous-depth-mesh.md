@@ -25,8 +25,9 @@ candidate scene geometry. The mesh:
 - retains normalized source RGB as an observed texture;
 - uses aspect-correct image-plane X/Y coordinates;
 - stores the aligned unitless relative proximity as Z;
-- removes triangle connectivity from sampled cells containing a sharp local
-  depth jump; and
+- detects sampled cells containing a sharp local depth jump, subdivides those
+  cells at source-pixel resolution, and removes only residual triangles that
+  still cross the threshold; and
 - records the cut cells separately from observed RGB.
 
 The algorithm does not assign semantic names to regions. A depth discontinuity
@@ -42,6 +43,9 @@ viewer, and their completion masks must not be reused for the continuous mesh.
 - Gradual relief remains continuous instead of collapsing into three motions.
 - Strong depth boundaries no longer force triangles to stretch between front
   and rear surfaces.
+- Local refinement retains both sides of a depth boundary without applying a
+  source-resolution mesh to the entire image. The earlier whole-cell removal
+  remains an explicit comparison mode, and refinement work is resource-bounded.
 - The default scene package retains every observed RGB pixel independently of
   mesh-cut diagnostics.
 - The renderer must use a z-buffer and measure newly visible holes across its

@@ -93,6 +93,12 @@ class MeshBaselineArtifactTests(unittest.TestCase):
             self.assertEqual(manifest["source"]["provenance"], "observed")
             self.assertEqual(manifest["depthInput"]["provenance"], "inferred")
             self.assertTrue(manifest["algorithm"]["result"]["defaultTexturePixelIdentical"])
+            self.assertEqual(manifest["algorithm"]["version"], "0.2")
+            self.assertTrue(manifest["algorithm"]["configuration"]["refineDepthBoundaries"])
+            self.assertGreater(
+                manifest["algorithm"]["result"]["refinedSourceCellCount"],
+                0,
+            )
             self.assertEqual(
                 manifest["artifacts"]["vertices"]["sha256"],
                 _sha256(artifacts.vertices),
