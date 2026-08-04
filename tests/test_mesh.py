@@ -40,6 +40,9 @@ class ContinuousDepthMeshTests(unittest.TestCase):
         self.assertFalse(result.cut_cells.any())
         self.assertFalse(result.cut_source_mask.any())
         self.assertEqual(result.retained_face_fraction, 1.0)
+        self.assertEqual(result.refined_base_cell_count, 0)
+        self.assertEqual(result.refined_source_cell_count, 0)
+        self.assertEqual(result.residual_cut_source_cell_count, 0)
         np.testing.assert_allclose(result.vertices[0], (-1.25, 1.0, 0.0))
         np.testing.assert_allclose(result.vertices[-1], (1.25, -1.0, 0.0))
         np.testing.assert_allclose(result.texture_coordinates[0], (0.0, 0.0))
@@ -69,6 +72,36 @@ class ContinuousDepthMeshTests(unittest.TestCase):
         self.assertTrue(np.all(np.ptp(face_depth, axis=1) <= 0.2))
         self.assertLess(result.retained_face_fraction, 1.0)
 
+    def test_refines_only_depth_boundary_cells_and_reduces_removed_coverage(self) -> None:
+        image = _image(height=8, width=12)
+        depth = np.full((8, 12), 0.1, dtype=np.float32)
+        depth[:, 6:] = 0.8
+        legacy = build_continuous_depth_mesh(
+            image,
+            depth,
+            config=MeshBuildConfig(
+                max_mesh_dimension=4,
+                depth_jump_threshold=0.2,
+                refine_depth_boundaries=False,
+            ),
+        )
+
+        refined = build_continuous_depth_mesh(
+            image,
+            depth,
+            config=MeshBuildConfig(max_mesh_dimension=4, depth_jump_threshold=0.2),
+        )
+
+        self.assertGreater(refined.refined_base_cell_count, 0)
+        self.assertGreater(refined.refined_source_cell_count, 0)
+        self.assertGreater(refined.faces.shape[0], legacy.faces.shape[0])
+        self.assertLess(
+            np.count_nonzero(refined.cut_source_mask),
+            np.count_nonzero(legacy.cut_source_mask),
+        )
+        refined_face_depth = refined.vertices[refined.faces, 2]
+        self.assertTrue(np.all(np.ptp(refined_face_depth, axis=1) <= 0.2))
+
     def test_preview_preserves_rgb_outside_red_cut_overlay(self) -> None:
         image = _image()
         mask = np.zeros((4, 5), dtype=np.bool_)
@@ -90,6 +123,8 @@ class ContinuousDepthMeshTests(unittest.TestCase):
             MeshBuildConfig(max_mesh_dimension=2049),
             MeshBuildConfig(depth_jump_threshold=0.0),
             MeshBuildConfig(depth_jump_threshold=1.1),
+            MeshBuildConfig(refine_depth_boundaries=1),  # type: ignore[arg-type]
+            MeshBuildConfig(max_refined_source_cells=0),
             MeshBuildConfig(preview_overlay_alpha=0.0),
         )
         for config in invalid_configs:
@@ -104,6 +139,18 @@ class ContinuousDepthMeshTests(unittest.TestCase):
         invalid_range[0, 0] = np.nan
         with self.assertRaisesRegex(MeshContractError, "finite"):
             build_continuous_depth_mesh(image, invalid_range)
+
+        cliff = np.zeros((4, 5), dtype=np.float32)
+        cliff[:, 2:] = 1.0
+        with self.assertRaisesRegex(MeshContractError, "exceeding"):
+            build_continuous_depth_mesh(
+                image,
+                cliff,
+                config=MeshBuildConfig(
+                    max_mesh_dimension=2,
+                    max_refined_source_cells=1,
+                ),
+            )
 
 
 if __name__ == "__main__":

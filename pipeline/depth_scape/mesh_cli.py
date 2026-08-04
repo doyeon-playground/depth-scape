@@ -40,6 +40,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Adjacent normalized-depth change that cuts intersecting mesh cells",
     )
     parser.add_argument(
+        "--no-boundary-refinement",
+        action="store_true",
+        help="Keep the earlier behavior that removes an entire sampled cell at a depth jump",
+    )
+    parser.add_argument(
+        "--max-refined-source-cells",
+        type=int,
+        default=defaults.max_refined_source_cells,
+        help="CPU and memory limit for pixel-scale cells added near depth boundaries",
+    )
+    parser.add_argument(
         "--preview-overlay-alpha",
         type=float,
         default=defaults.preview_overlay_alpha,
@@ -72,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
     config = MeshBuildConfig(
         max_mesh_dimension=args.max_mesh_dimension,
         depth_jump_threshold=args.depth_jump_threshold,
+        refine_depth_boundaries=not args.no_boundary_refinement,
+        max_refined_source_cells=args.max_refined_source_cells,
         preview_overlay_alpha=args.preview_overlay_alpha,
     )
     try:

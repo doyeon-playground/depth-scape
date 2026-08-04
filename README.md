@@ -72,9 +72,11 @@ reconstruction are also outside the project scope.
 ## Project status
 
 DepthScape is currently in the **baseline-evaluation** stage. Reproducible
-relative-depth, three-layer comparison, bounded layer-camera, and cut
-continuous-mesh pipelines are available. The next experiment will evaluate the
-mesh through a bounded Python renderer before any hidden-content completion.
+relative-depth and cut continuous-mesh pipelines are available, together with
+a bounded, z-buffered Python rendering baseline. The earlier three-layer
+pipeline remains only for reproducible comparison. The next experiment will
+turn measured mesh disocclusions into coherent hidden-surface completion
+requests before generating any RGB or depth.
 
 ## Try the depth and mesh baselines
 
@@ -89,6 +91,9 @@ depth-scape-depth demo-landscape.png --output-dir runs/demo
 depth-scape-mesh demo-landscape.png \
   --depth-run-dir runs/demo \
   --output-dir runs/demo-mesh
+depth-scape-render \
+  --mesh-run-dir runs/demo-mesh \
+  --output-dir runs/demo-mesh-camera
 
 # Optional comparison with the earlier three-layer baseline
 depth-scape-layers demo-landscape.png \
@@ -105,12 +110,26 @@ machine running the command. The numeric output is unitless relative proximity,
 where larger values mean nearer content; it is not metric depth.
 
 The mesh command validates that the depth run belongs to the same normalized
-image, samples an aspect-correct continuous surface, and removes triangle
-connectivity from cells containing sharp local depth jumps. It exports the
-pixel-identical observed texture separately from inferred geometry and renders
-an RGB-preserving cut diagnostic. It does not classify sky, terrain, or other
-semantic content. See [experiment 0004](docs/experiments/0004-continuous-depth-mesh.md)
-for the artifact contract and first landscape observation.
+image, samples an aspect-correct continuous surface, and detects coarse cells
+containing sharp local depth jumps. Those cells are refined at source-pixel
+resolution so only residual pixel-scale crossings lose their triangles. It
+exports the pixel-identical observed texture separately from inferred geometry
+and renders an RGB-preserving cut diagnostic. It does not classify sky,
+terrain, or other semantic content. The former whole-cell behavior remains
+available through `--no-boundary-refinement` for comparison. See
+[experiment 0004](docs/experiments/0004-continuous-depth-mesh.md) for the
+original geometry contract.
+
+The render command safely validates a mesh run and rasterizes three bounded
+horizontal camera positions with a deterministic CPU z-buffer. Camera position
+is normalized to `[-1, 1]`; position `0` is the observed source composition,
+while the endpoint views reveal currently unsupported pixels. It exports the
+center and endpoint views, separates source-view geometry gaps from movement
+disocclusions, and records the sampled camera contract in `mesh-camera.json`.
+The default output is limited to 512 pixels on its longest side and is an
+accuracy baseline rather than the final interactive renderer. See
+[experiment 0005](docs/experiments/0005-mesh-visibility.md) for measured
+coverage and runtime.
 
 The layer and planning commands remain available as reproducible comparison
 baselines. Their fixed three-band camera and completion masks are not the final
@@ -139,6 +158,7 @@ for the exact model revision, weight digest, artifact contract, and known risks.
 - [Layer baseline experiment](docs/experiments/0002-layer-baseline.md)
 - [Camera and disocclusion experiment](docs/experiments/0003-disocclusion-planner.md)
 - [Continuous-depth mesh experiment](docs/experiments/0004-continuous-depth-mesh.md)
+- [Mesh visibility and boundary-refinement experiment](docs/experiments/0005-mesh-visibility.md)
 - [Scope decision](docs/decisions/0001-focus-on-landscape-2-5d.md)
 - [Python viewer decision](docs/decisions/0002-use-local-python-viewer.md)
 - [Continuous-depth mesh decision](docs/decisions/0003-use-cut-continuous-depth-mesh.md)

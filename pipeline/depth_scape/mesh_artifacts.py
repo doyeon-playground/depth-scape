@@ -163,7 +163,7 @@ def write_mesh_artifacts(
     git_revision, git_dirty = git_state()
     warnings = [
         "Mesh Z values are unitless relative proximity, not metric distance.",
-        "Removed faces mark inferred depth discontinuities; they are not deleted source pixels.",
+        "Residual cut faces mark inferred depth discontinuities; they are not deleted source pixels.",
         "The mesh does not contain hidden geometry or generated RGB.",
         "A renderer must stay inside separately verified camera bounds.",
     ]
@@ -249,10 +249,12 @@ def write_mesh_artifacts(
         },
         "algorithm": {
             "id": "continuous-depth-grid-cut",
-            "version": "0.1",
+            "version": "0.2",
             "configuration": {
                 "maxMeshDimension": config.max_mesh_dimension,
                 "depthJumpThreshold": config.depth_jump_threshold,
+                "refineDepthBoundaries": config.refine_depth_boundaries,
+                "maxRefinedSourceCells": config.max_refined_source_cells,
                 "previewOverlayAlpha": config.preview_overlay_alpha,
             },
             "result": {
@@ -265,6 +267,9 @@ def write_mesh_artifacts(
                 "faceCount": int(result.faces.shape[0]),
                 "cutCellCount": int(np.count_nonzero(result.cut_cells)),
                 "cutCellFraction": float(np.mean(result.cut_cells)),
+                "refinedBaseCellCount": result.refined_base_cell_count,
+                "refinedSourceCellCount": result.refined_source_cell_count,
+                "residualCutSourceCellCount": result.residual_cut_source_cell_count,
                 "retainedFaceFraction": result.retained_face_fraction,
                 "defaultTexturePixelIdentical": True,
             },
