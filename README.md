@@ -70,9 +70,32 @@ scope.
 
 ## Project status
 
-DepthScape is currently in the **planning and baseline-evaluation** stage. APIs,
-artifact formats, model choices, and implementation details may change as the
-first experiments are completed.
+DepthScape is currently in the **baseline-evaluation** stage. The first
+reproducible relative-depth pipeline is available, but its artifact schema and
+model choice remain experimental until the landscape failure set is evaluated.
+
+## Try the relative-depth baseline
+
+The baseline validates one JPG or PNG, applies its EXIF orientation, runs the
+pinned Depth Anything V2 Small checkpoint, and writes an aligned float32 depth
+artifact, an 8-bit preview, and a JSON run record.
+
+```bash
+python -m pip install -e ".[depth]"
+python samples/create_demo_landscape.py demo-landscape.png
+depth-scape-depth demo-landscape.png --output-dir runs/demo
+```
+
+The first run downloads a 99.2 MB model checkpoint. CUDA is used when available;
+otherwise the command follows a slower CPU-safe path. Input images stay on the
+machine running the command. The numeric output is unitless relative proximity,
+where larger values mean nearer content; it is not metric depth.
+
+For a hosted experiment, open the
+[Depth baseline notebook](notebooks/0001_depth_baseline.ipynb) in Colab. A Colab
+upload is transferred to that temporary Colab runtime, so do not use sensitive
+media there. See the [experiment record](docs/experiments/0001-depth-baseline.md)
+for the exact model revision, weight digest, artifact contract, and known risks.
 
 ## Documentation
 
@@ -80,6 +103,7 @@ first experiments are completed.
 - [Roadmap](docs/roadmap.md)
 - [Architecture](docs/architecture.md)
 - [Model baselines](docs/model-baselines.md)
+- [Depth baseline experiment](docs/experiments/0001-depth-baseline.md)
 - [Scope decision](docs/decisions/0001-focus-on-landscape-2-5d.md)
 - [Internationalization](docs/i18n.md)
 - [Contributing](CONTRIBUTING.md)
