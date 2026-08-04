@@ -5,8 +5,8 @@
 DepthScape is an open-source project that transforms one landscape photo into a
 layered, depth-aware scene. It estimates relative depth, separates the image
 into foreground, midground, and background layers, fills small regions hidden
-behind foreground objects, and renders a controlled parallax view in the
-browser.
+behind foreground objects, and renders a controlled parallax view in a local
+Python application.
 
 > [!IMPORTANT]
 > DepthScape does not recover the real content behind an object. Hidden regions
@@ -32,7 +32,7 @@ Landscape photo
     -> occlusion and hole masks
     -> background image and depth completion
     -> layered 2.5D scene
-    -> limited interactive parallax view
+    -> local Python parallax viewer
 ```
 
 The first viewer will constrain camera movement to a small, documented range.
@@ -64,16 +64,16 @@ The first release will:
 - render a keyboard-accessible, limited parallax view; and
 - retain enough configuration metadata to reproduce the result.
 
-Video reconstruction, live camera capture, unrestricted camera movement,
-metric depth, and full hidden-surface reconstruction are outside the project
-scope.
+Video reconstruction and live camera capture will not be added to DepthScape.
+Unrestricted camera movement, metric depth, and full hidden-surface
+reconstruction are also outside the project scope.
 
 ## Project status
 
 DepthScape is currently in the **baseline-evaluation** stage. Reproducible
-relative-depth and provisional three-layer pipelines are available, but their
-artifact schemas and model choices remain experimental until the landscape
-failure set is evaluated.
+relative-depth, three-layer, and bounded-camera planning pipelines are
+available, but their artifact schemas and model choices remain experimental
+until the landscape failure set is evaluated.
 
 ## Try the depth and layer baselines
 
@@ -88,6 +88,9 @@ depth-scape-depth demo-landscape.png --output-dir runs/demo
 depth-scape-layers demo-landscape.png \
   --depth-run-dir runs/demo \
   --output-dir runs/demo-layers
+depth-scape-plan \
+  --layer-run-dir runs/demo-layers \
+  --output-dir runs/demo-camera
 ```
 
 The first run downloads a 99.2 MB model checkpoint. CUDA is used when available;
@@ -101,6 +104,13 @@ background, midground, and foreground masks. These are inferred relative-depth
 groups, not semantic segmentation or metric distance bands. See
 [experiment 0002](docs/experiments/0002-layer-baseline.md) for the artifact
 contract and the first landscape observation.
+
+The planning command keeps the background fixed, moves the midground at half
+the foreground displacement, and inspects every integer foreground shift in a
+bounded range. It writes the per-layer regions that require hidden-content
+completion, endpoint hole diagnostics, and `camera-plan.json`. This is a
+pixel-space motion contract for the future Python viewer, not a physical camera
+model.
 
 For a hosted experiment, open the
 [Depth baseline notebook](notebooks/0001_depth_baseline.ipynb) in Colab. A Colab
@@ -116,7 +126,9 @@ for the exact model revision, weight digest, artifact contract, and known risks.
 - [Model baselines](docs/model-baselines.md)
 - [Depth baseline experiment](docs/experiments/0001-depth-baseline.md)
 - [Layer baseline experiment](docs/experiments/0002-layer-baseline.md)
+- [Camera and disocclusion experiment](docs/experiments/0003-disocclusion-planner.md)
 - [Scope decision](docs/decisions/0001-focus-on-landscape-2-5d.md)
+- [Python viewer decision](docs/decisions/0002-use-local-python-viewer.md)
 - [Internationalization](docs/i18n.md)
 - [Contributing](CONTRIBUTING.md)
 
@@ -124,7 +136,7 @@ for the exact model revision, weight digest, artifact contract, and known risks.
 
 ```text
 depth-scape/
-|-- frontend/       # Image workflow and limited-parallax viewer
+|-- viewer/         # Local Python workflow and limited-parallax viewer
 |-- pipeline/       # Depth, layers, inpainting, and scene packaging
 |-- samples/        # Small, redistributable landscape inputs
 |-- tests/          # Numeric and pipeline-boundary verification

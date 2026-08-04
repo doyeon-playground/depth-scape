@@ -2,9 +2,9 @@
 
 ## Status
 
-This document defines a technology-neutral architecture for a single landscape
-photo and a limited 2.5D viewer. It does not commit the project to a framework,
-deployment provider, or fixed model dependency.
+This document defines the architecture for a single landscape photo and a
+local Python 2.5D viewer. The Python delivery boundary is fixed, while the GUI
+and rendering toolkit, scene format, and model dependencies remain replaceable.
 
 ## Data flow
 
@@ -30,7 +30,7 @@ Hidden RGB and depth completion
 Layered scene package with provenance
     |
     v
-Limited-parallax viewer
+Local Python limited-parallax viewer
 ```
 
 ## Logical components
@@ -83,6 +83,27 @@ surfaces. Per-pixel data remains in binary artifacts rather than JSON.
 - Requests completion only for the union of required disocclusion regions.
 - Rejects or clamps camera movement outside generated coverage.
 
+The provisional planner uses discrete horizontal layer translation rather than
+a physical camera. Camera position is normalized to `[-1, 1]`, where `0`
+preserves the source composition. Background remains fixed; midground moves at
+half the foreground displacement. The default foreground limit is 2% of image
+width with a 64-pixel cap. Every integer foreground shift in that range is
+evaluated.
+
+| Artifact | Current contract |
+| --- | --- |
+| `background-disocclusion-mask.png` | Background source-grid pixels needed behind nearer layers |
+| `midground-disocclusion-mask.png` | Midground source-grid pixels needed behind foreground |
+| `all-view-holes.png` | Viewport pixels exposed at any supported position before completion |
+| `left-view-holes.png` | Missing viewport pixels at camera position `-1` |
+| `right-view-holes.png` | Missing viewport pixels at camera position `+1` |
+| `disocclusion-preview.png` | Fixed-palette target-layer diagnostic; display only |
+| `camera-plan.json` | Bounds, shifts, hashes, pixel counts, timing, and warnings |
+
+All masks are uint8 PNG files with `255=included` and `0=excluded`. Completion
+must run independently for each target layer even where their required regions
+overlap.
+
 ### Completion adapters
 
 - Generate RGB content only inside requested masks.
@@ -101,14 +122,16 @@ surfaces. Per-pixel data remains in binary artifacts rather than JSON.
 
 ### Viewer
 
+- Runs as a local Python application; a browser frontend is not part of the
+  product plan.
 - Consumes the scene contract rather than model-specific tensors.
 - Supports bounded horizontal parallax, reset, keyboard navigation, and a
   reduced-motion path.
 - Can display generated-region provenance without relying on color alone.
 - Prevents free-orbit navigation that would expose unsupported geometry.
 
-The first experiment may run as local scripts or notebooks. A network service
-should be introduced only if a later product decision requires it.
+Experiments may run as local scripts or notebooks. The viewer must not require
+a network service, account, browser runtime, or retained upload.
 
 ## Scene representation
 

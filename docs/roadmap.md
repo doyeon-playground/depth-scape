@@ -51,13 +51,16 @@ default viewpoint still matches the source composition.
 depth coverage inside the allowed camera range, with generated regions clearly
 identified.
 
-## Phase 4: Interactive viewer
+## Phase 4: Local Python viewer
 
 - Package textures, masks, layers, camera bounds, and metadata as a scene.
 - Add horizontal parallax, reset, reduced-motion, and keyboard controls.
 - Add source, depth, layer, and generated-region inspection modes.
 - Localize the user-facing workflow in supported languages.
-- Validate current desktop browsers and define graceful capability errors.
+- Select the smallest suitable Python GUI/rendering toolkit through a measured
+  prototype.
+- Validate supported desktop Python environments and define graceful graphics
+  capability errors.
 
 **Exit condition:** a user can create and inspect a bounded 2.5D scene through
 one coherent local workflow.
@@ -74,10 +77,13 @@ one coherent local workflow.
 **Exit condition:** the project has documented supported scenes, failure cases,
 resource expectations, and a justified decision about custom training.
 
-## Explicitly deferred
+## Permanently excluded
 
 - Video reconstruction and temporal fusion.
 - Live-camera capture or real-time SLAM.
+
+## Explicitly deferred
+
 - Unrestricted 3D navigation.
 - Metric reconstruction and hidden-surface ground truth.
 - Large-model training from scratch.

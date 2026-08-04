@@ -5,7 +5,8 @@
 DepthScape es un proyecto de código abierto que transforma una foto de paisaje
 en una escena por capas con profundidad. Estima la profundidad relativa, separa
 la imagen en primer plano, plano medio y fondo, genera pequeñas zonas ocultas
-por el primer plano y ofrece un efecto de paralaje limitado en el navegador.
+por el primer plano y ofrece un efecto de paralaje limitado en un visor local
+escrito en Python.
 
 > [!IMPORTANT]
 > DepthScape no recupera el contenido real detrás de un objeto. Las zonas
