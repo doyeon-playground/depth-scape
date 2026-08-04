@@ -35,7 +35,7 @@ class DepthArtifacts:
     manifest: Path
 
 
-def _git_state() -> tuple[str | None, bool | None]:
+def git_state() -> tuple[str | None, bool | None]:
     """Return the source checkout revision and dirtiness when Git is available."""
 
     repository = Path(__file__).resolve().parents[2]
@@ -131,7 +131,7 @@ def write_depth_artifacts(
     artifacts = _prepare_targets(output_dir, overwrite=overwrite)
     model = prediction.model
     telemetry = prediction.telemetry
-    git_revision, git_dirty = _git_state()
+    git_revision, git_dirty = git_state()
     warnings = [
         "Relative depth is unitless and must not be interpreted as metric distance.",
         "Every value in the depth artifact is inferred from the observed RGB image.",

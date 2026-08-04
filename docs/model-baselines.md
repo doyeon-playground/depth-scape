@@ -42,6 +42,17 @@ simple layer-depth prior with an explicit depth-completion method. The chosen
 approach must preserve foreground/background ordering and avoid placing
 generated background in front of its occluder.
 
+### Layer construction
+
+**Experimental baseline:** edge-preserving histogram k-means
+
+DepthScape currently combines RGB luminance and relative-depth discontinuities,
+smooths depth within low-edge regions, and clusters the distribution into three
+far-to-near groups. This is deterministic project-owned geometry logic, not a
+semantic segmentation model. The source/depth alignment contract, parameters,
+artifacts, and first landscape observation are recorded in
+[experiment 0002](experiments/0002-layer-baseline.md).
+
 ## DepthScape-owned logic
 
 The project's initial technical contribution is the reproducible system around

@@ -70,11 +70,12 @@ scope.
 
 ## Project status
 
-DepthScape is currently in the **baseline-evaluation** stage. The first
-reproducible relative-depth pipeline is available, but its artifact schema and
-model choice remain experimental until the landscape failure set is evaluated.
+DepthScape is currently in the **baseline-evaluation** stage. Reproducible
+relative-depth and provisional three-layer pipelines are available, but their
+artifact schemas and model choices remain experimental until the landscape
+failure set is evaluated.
 
-## Try the relative-depth baseline
+## Try the depth and layer baselines
 
 The baseline validates one JPG or PNG, applies its EXIF orientation, runs the
 pinned Depth Anything V2 Small checkpoint, and writes an aligned float32 depth
@@ -84,12 +85,22 @@ artifact, an 8-bit preview, and a JSON run record.
 python -m pip install -e ".[depth]"
 python samples/create_demo_landscape.py demo-landscape.png
 depth-scape-depth demo-landscape.png --output-dir runs/demo
+depth-scape-layers demo-landscape.png \
+  --depth-run-dir runs/demo \
+  --output-dir runs/demo-layers
 ```
 
 The first run downloads a 99.2 MB model checkpoint. CUDA is used when available;
 otherwise the command follows a slower CPU-safe path. Input images stay on the
 machine running the command. The numeric output is unitless relative proximity,
 where larger values mean nearer content; it is not metric depth.
+
+The layer command validates that the depth run belongs to the same normalized
+image, combines RGB and depth discontinuities, and exports exhaustive
+background, midground, and foreground masks. These are inferred relative-depth
+groups, not semantic segmentation or metric distance bands. See
+[experiment 0002](docs/experiments/0002-layer-baseline.md) for the artifact
+contract and the first landscape observation.
 
 For a hosted experiment, open the
 [Depth baseline notebook](notebooks/0001_depth_baseline.ipynb) in Colab. A Colab
@@ -104,6 +115,7 @@ for the exact model revision, weight digest, artifact contract, and known risks.
 - [Architecture](docs/architecture.md)
 - [Model baselines](docs/model-baselines.md)
 - [Depth baseline experiment](docs/experiments/0001-depth-baseline.md)
+- [Layer baseline experiment](docs/experiments/0002-layer-baseline.md)
 - [Scope decision](docs/decisions/0001-focus-on-landscape-2-5d.md)
 - [Internationalization](docs/i18n.md)
 - [Contributing](CONTRIBUTING.md)
