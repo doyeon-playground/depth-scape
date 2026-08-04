@@ -157,6 +157,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# DepthScape experiment artifacts and model caches
+runs/
+.hf-cache/
+
 # Spyder project settings
 .spyderproject
 .spyproject

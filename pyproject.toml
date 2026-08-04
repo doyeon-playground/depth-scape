@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=75,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "depth-scape"
+version = "0.1.0"
+description = "Turn a landscape photo into an explorable layered 2.5D scene."
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "MIT"
+dependencies = [
+    "numpy>=1.26,<3",
+    "Pillow>=10.4,<13",
+]
+
+[project.optional-dependencies]
+depth = [
+    "safetensors>=0.4.5,<1",
+    "torch>=2.4,<3",
+    "transformers==4.56.0",
+]
+
+[project.scripts]
+depth-scape-depth = "depth_scape.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "pipeline"}
+
+[tool.setuptools.packages.find]
+where = ["pipeline"]
+
+[tool.pytest.ini_options]
+pythonpath = ["pipeline"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["pipeline"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "SIM"]
