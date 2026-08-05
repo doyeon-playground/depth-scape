@@ -103,13 +103,27 @@ class HiddenSurfaceTests(unittest.TestCase):
 
         expected_mapped = np.zeros((3, 8), dtype=np.bool_)
         expected_mapped[:, 3:5] = True
-        expected_unresolved = np.zeros((3, 8), dtype=np.bool_)
-        expected_unresolved[:, 0] = True
-        expected_unresolved[:, 7] = True
+        expected_border = np.zeros((3, 8), dtype=np.bool_)
+        expected_border[:, 0] = True
+        expected_border[:, 7] = True
+        expected_outpaint = np.zeros((3, 12), dtype=np.bool_)
+        expected_outpaint[:, 1] = True
+        expected_outpaint[:, 10] = True
         np.testing.assert_array_equal(plan.all_mapped_view_holes, expected_mapped)
-        np.testing.assert_array_equal(plan.all_border_view_holes, expected_unresolved)
+        np.testing.assert_array_equal(plan.all_border_view_holes, expected_border)
+        self.assertFalse(plan.all_unmapped_border_view_holes.any())
+        np.testing.assert_array_equal(plan.outpaint_request_mask, expected_outpaint)
+        np.testing.assert_array_equal(plan.all_outpaint_mapped_view_holes, expected_border)
+        np.testing.assert_array_equal(
+            plan.all_supported_view_holes,
+            expected_mapped | expected_border,
+        )
+        np.testing.assert_allclose(plan.outpaint_relative_depth_hint[:, 1], 0.4)
+        np.testing.assert_allclose(plan.outpaint_relative_depth_hint[:, 10], 0.4)
+        self.assertFalse(plan.outpaint_request_mask[:, 2:10].any())
+        self.assertEqual(plan.horizontal_padding, 2)
         self.assertFalse(plan.all_ambiguous_depth_view_holes.any())
-        np.testing.assert_array_equal(plan.all_unresolved_view_holes, expected_unresolved)
+        self.assertFalse(plan.all_unresolved_view_holes.any())
         self.assertFalse(plan.mapped_view_holes[1].any())
         self.assertFalse(plan.unresolved_view_holes[1].any())
 
@@ -136,7 +150,7 @@ class HiddenSurfaceTests(unittest.TestCase):
         )
         np.testing.assert_array_equal(
             plan.all_unresolved_view_holes,
-            visibility.all_view_holes,
+            expected_ambiguous,
         )
 
     def test_rejects_invalid_config_and_misaligned_view_arrays(self) -> None:
@@ -152,6 +166,34 @@ class HiddenSurfaceTests(unittest.TestCase):
 
         with self.assertRaises(HiddenSurfaceContractError):
             plan_hidden_surfaces(replace(visibility, sampled_depths=visibility.sampled_depths[:2]))
+        with self.assertRaises(HiddenSurfaceContractError):
+            plan_hidden_surfaces(
+                visibility,
+                config=HiddenSurfaceConfig(max_request_pixels=11),
+            )
+
+    def test_leaves_a_fully_uncovered_row_without_an_edge_depth_unresolved(self) -> None:
+        visibility = _visibility_plan()
+        coverages = list(visibility.sampled_coverages)
+        depths = list(visibility.sampled_depths)
+        left_coverage = coverages[0].copy()
+        left_depth = depths[0].copy()
+        left_coverage[0] = False
+        left_depth[0] = -np.inf
+        coverages[0] = left_coverage
+        depths[0] = left_depth
+
+        plan = plan_hidden_surfaces(
+            replace(
+                visibility,
+                sampled_coverages=tuple(coverages),
+                sampled_depths=tuple(depths),
+            )
+        )
+
+        self.assertTrue(plan.unresolved_view_holes[0][0].all())
+        self.assertFalse(plan.outpaint_mapped_view_holes[0][0].any())
+        self.assertTrue(plan.unmapped_border_view_holes[0][0].all())
 
     def test_writes_coupled_request_contract_without_generated_content(self) -> None:
         visibility = _visibility_plan()
@@ -174,6 +216,9 @@ class HiddenSurfaceTests(unittest.TestCase):
             np.testing.assert_array_equal(saved_mask, plan.request_mask)
             saved_hint = np.load(artifacts.relative_depth_hint, allow_pickle=False)
             np.testing.assert_array_equal(saved_hint, plan.relative_depth_hint)
+            with Image.open(artifacts.outpaint_request_mask) as opened:
+                saved_outpaint = np.asarray(opened).copy() == 255
+            np.testing.assert_array_equal(saved_outpaint, plan.outpaint_request_mask)
             manifest = json.loads(artifacts.manifest.read_text(encoding="utf-8"))
             self.assertEqual(
                 manifest["generationRequest"]["requiredChannels"],
@@ -181,6 +226,18 @@ class HiddenSurfaceTests(unittest.TestCase):
             )
             self.assertFalse(manifest["source"]["observedRgbModified"])
             self.assertEqual(manifest["result"]["requestPixels"], 6)
+            self.assertEqual(manifest["result"]["outpaintRequestPixels"], 6)
+            self.assertEqual(manifest["result"]["totalRequestPixels"], 12)
+            self.assertEqual(manifest["result"]["totalViewportHolePixels"], 12)
+            self.assertEqual(manifest["result"]["supportedViewportHolePixels"], 12)
+            self.assertEqual(manifest["result"]["supportedViewportHoleFraction"], 1.0)
+            self.assertEqual(manifest["result"]["unresolvedViewportHolePixels"], 0)
+            self.assertEqual(manifest["result"]["unmappedBorderViewportHolePixels"], 0)
+            self.assertTrue(manifest["result"]["readyForSampledViewsAfterGeneration"])
+            self.assertEqual(
+                manifest["artifacts"]["outpaintRequestMask"]["dtype"],
+                "uint8",
+            )
             self.assertIn("does not contain either", manifest["warnings"][0])
 
             with self.assertRaises(HiddenSurfaceArtifactError):

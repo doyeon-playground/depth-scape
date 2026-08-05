@@ -111,8 +111,9 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "requestMask": str(artifacts.request_mask),
                 "relativeDepthHint": str(artifacts.relative_depth_hint),
+                "outpaintRequestMask": str(artifacts.outpaint_request_mask),
                 "unresolvedViewHoles": str(artifacts.unresolved_view_holes),
-                "preview": str(artifacts.preview),
+                "preview": str(artifacts.completion_preview),
                 "manifest": str(artifacts.manifest),
             },
             indent=2,
