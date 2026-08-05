@@ -227,6 +227,18 @@ def write_mesh_visibility_artifacts(
             "maxNearShiftPixelsApplied": plan.max_near_shift_pixels,
             "maxFaces": config.max_faces,
             "sampledPositions": list(plan.camera_positions),
+            "sampledPositionsOverride": config.sampled_positions,
+            "maxSampleShiftStepPixelsRequested": config.max_sample_shift_step_pixels,
+            "maxNearShiftStepPixelsObserved": round(
+                max(
+                    abs(right - left) * plan.max_near_shift_pixels
+                    for left, right in zip(
+                        plan.camera_positions,
+                        plan.camera_positions[1:],
+                    )
+                ),
+                6,
+            ),
             "samplingLimitation": "finite sampled positions; not a continuous-path proof",
             "renderer": "deterministic CPU triangle rasterizer with larger-relative-Z-wins buffer",
         },

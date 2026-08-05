@@ -56,10 +56,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=visibility_defaults.sampled_positions,
     )
     parser.add_argument(
+        "--max-sample-shift-step-pixels",
+        type=int,
+        default=visibility_defaults.max_sample_shift_step_pixels,
+    )
+    parser.add_argument(
         "--min-depth-separation",
         type=float,
         default=hidden_defaults.min_depth_separation,
         help="Minimum near-minus-far relative-depth gap for a safe mapping",
+    )
+    parser.add_argument(
+        "--depth-support-radius",
+        type=int,
+        default=hidden_defaults.depth_support_radius,
+        help="Pixels sampled on each side of an interior hole for depth ordering",
     )
     parser.add_argument(
         "--max-request-pixels",
@@ -83,9 +94,11 @@ def main(argv: list[str] | None = None) -> int:
         max_near_shift_fraction=args.max_near_shift_fraction,
         max_near_shift_pixels=args.max_near_shift_pixels,
         sampled_positions=args.sampled_positions,
+        max_sample_shift_step_pixels=args.max_sample_shift_step_pixels,
     )
     hidden_surface_config = HiddenSurfaceConfig(
         min_depth_separation=args.min_depth_separation,
+        depth_support_radius=args.depth_support_radius,
         max_request_pixels=args.max_request_pixels,
     )
     try:

@@ -153,11 +153,29 @@ class HiddenSurfaceTests(unittest.TestCase):
             expected_ambiguous,
         )
 
+    def test_uses_local_2d_depth_support_for_a_non_horizontal_boundary(self) -> None:
+        visibility = _visibility_plan()
+        depths = list(visibility.sampled_depths)
+        right_depth = depths[2].copy()
+        right_depth[1] = 0.4
+        right_depth[1, [3, 7]] = -np.inf
+        depths[2] = right_depth
+
+        plan = plan_hidden_surfaces(replace(visibility, sampled_depths=tuple(depths)))
+
+        expected = np.zeros((3, 8), dtype=np.bool_)
+        expected[1, 3] = True
+        np.testing.assert_array_equal(plan.all_local_support_view_holes, expected)
+        self.assertTrue(plan.mapped_view_holes[2][1, 3])
+        self.assertFalse(plan.unresolved_view_holes[2][1, 3])
+
     def test_rejects_invalid_config_and_misaligned_view_arrays(self) -> None:
         visibility = _visibility_plan()
         invalid_configs = (
             HiddenSurfaceConfig(min_depth_separation=0.0),
             HiddenSurfaceConfig(min_depth_separation=1.1),
+            HiddenSurfaceConfig(depth_support_radius=0),
+            HiddenSurfaceConfig(depth_support_radius=17),
             HiddenSurfaceConfig(max_request_pixels=0),
         )
         for config in invalid_configs:
@@ -195,6 +213,23 @@ class HiddenSurfaceTests(unittest.TestCase):
         self.assertFalse(plan.outpaint_mapped_view_holes[0][0].any())
         self.assertTrue(plan.unmapped_border_view_holes[0][0].all())
 
+    def test_reuses_observed_edge_rgb_when_projection_stays_inside_source(self) -> None:
+        visibility = _visibility_plan()
+        depths = list(visibility.sampled_depths)
+        left_depth = depths[0].copy()
+        left_depth[:, 1] = 0.0
+        depths[0] = left_depth
+
+        plan = plan_hidden_surfaces(replace(visibility, sampled_depths=tuple(depths)))
+
+        expected_seam = np.zeros((3, 8), dtype=np.bool_)
+        expected_seam[:, 0] = True
+        np.testing.assert_array_equal(plan.seam_support_mask, expected_seam)
+        np.testing.assert_array_equal(plan.all_seam_mapped_view_holes, expected_seam)
+        np.testing.assert_allclose(plan.seam_relative_depth_hint[:, 0], 0.0)
+        self.assertFalse(plan.unmapped_border_view_holes[0].any())
+        self.assertFalse(plan.unresolved_view_holes[0].any())
+
     def test_writes_coupled_request_contract_without_generated_content(self) -> None:
         visibility = _visibility_plan()
         plan = plan_hidden_surfaces(visibility)
@@ -226,7 +261,10 @@ class HiddenSurfaceTests(unittest.TestCase):
             )
             self.assertFalse(manifest["source"]["observedRgbModified"])
             self.assertEqual(manifest["result"]["requestPixels"], 6)
+            self.assertEqual(manifest["result"]["localDepthSupportViewportHolePixels"], 0)
             self.assertEqual(manifest["result"]["outpaintRequestPixels"], 6)
+            self.assertEqual(manifest["result"]["seamSupportPixels"], 0)
+            self.assertEqual(manifest["result"]["seamMappedViewportHolePixels"], 0)
             self.assertEqual(manifest["result"]["totalRequestPixels"], 12)
             self.assertEqual(manifest["result"]["totalViewportHolePixels"], 12)
             self.assertEqual(manifest["result"]["supportedViewportHolePixels"], 12)
@@ -238,6 +276,7 @@ class HiddenSurfaceTests(unittest.TestCase):
                 manifest["artifacts"]["outpaintRequestMask"]["dtype"],
                 "uint8",
             )
+            self.assertFalse(manifest["geometrySupport"]["edgeSeam"]["generatedRgb"])
             self.assertIn("does not contain either", manifest["warnings"][0])
 
             with self.assertRaises(HiddenSurfaceArtifactError):

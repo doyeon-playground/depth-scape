@@ -15,13 +15,13 @@ from depth_scape.mesh_visibility import (
 )
 
 
-def _loaded_mesh(*, cut: bool = False) -> LoadedMeshRun:
-    height, width = 6, 10
+def _loaded_mesh(*, cut: bool = False, width: int = 10) -> LoadedMeshRun:
+    height = 6
     y, x = np.mgrid[:height, :width]
     texture = np.stack((x * 20, y * 30, (x + y) * 10), axis=-1).astype(np.uint8)
     depth = np.ones((height, width), dtype=np.float32)
     if cut:
-        depth[:, :5] = 0.1
+        depth[:, : width // 2] = 0.1
     result = build_continuous_depth_mesh(
         Image.fromarray(texture, mode="RGB"),
         depth,
@@ -87,6 +87,21 @@ class MeshVisibilityTests(unittest.TestCase):
         self.assertFalse(plan.center_geometry_holes.any())
         self.assertTrue(plan.all_view_holes.any())
 
+    def test_automatically_samples_by_near_surface_pixel_displacement(self) -> None:
+        plan = plan_mesh_visibility(
+            _loaded_mesh(width=50),
+            config=MeshVisibilityConfig(
+                max_render_dimension=50,
+                max_near_shift_fraction=0.1,
+                max_sample_shift_step_pixels=2,
+            ),
+        )
+
+        self.assertEqual(plan.max_near_shift_pixels, 5)
+        self.assertEqual(len(plan.camera_positions), 7)
+        observed_steps = np.diff(plan.camera_positions) * plan.max_near_shift_pixels
+        self.assertLessEqual(float(np.max(np.abs(observed_steps))), 2.0)
+
     def test_bounds_render_size_and_rejects_invalid_configuration(self) -> None:
         plan = plan_mesh_visibility(
             _loaded_mesh(),
@@ -104,6 +119,8 @@ class MeshVisibilityTests(unittest.TestCase):
             MeshVisibilityConfig(max_near_shift_pixels=0),
             MeshVisibilityConfig(sampled_positions=4),
             MeshVisibilityConfig(sampled_positions=35),
+            MeshVisibilityConfig(max_sample_shift_step_pixels=0),
+            MeshVisibilityConfig(max_sample_shift_step_pixels=65),
         )
         for config in invalid:
             with self.subTest(config=config), self.assertRaises(MeshVisibilityError):

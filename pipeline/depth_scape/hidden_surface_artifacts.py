@@ -36,8 +36,13 @@ class HiddenSurfaceArtifacts:
     outpaint_request_mask: Path
     outpaint_relative_depth_hint: Path
     outpaint_request_observation_count: Path
+    seam_support_mask: Path
+    seam_relative_depth_hint: Path
+    seam_support_observation_count: Path
     mapped_view_holes: Path
+    local_support_view_holes: Path
     outpaint_mapped_view_holes: Path
+    seam_mapped_view_holes: Path
     border_view_holes: Path
     unmapped_border_view_holes: Path
     ambiguous_depth_view_holes: Path
@@ -70,8 +75,13 @@ def _prepare_targets(output_dir: Path, *, overwrite: bool) -> HiddenSurfaceArtif
         outpaint_request_observation_count=(
             directory / "horizontal-outpaint-observation-count.npy"
         ),
+        seam_support_mask=directory / "observed-edge-seam-mask.png",
+        seam_relative_depth_hint=directory / "observed-edge-seam-depth-hint.npy",
+        seam_support_observation_count=(directory / "observed-edge-seam-observation-count.npy"),
         mapped_view_holes=directory / "mapped-view-holes.png",
+        local_support_view_holes=directory / "local-depth-support-view-holes.png",
         outpaint_mapped_view_holes=directory / "outpaint-mapped-view-holes.png",
+        seam_mapped_view_holes=directory / "observed-edge-seam-view-holes.png",
         border_view_holes=directory / "border-view-holes.png",
         unmapped_border_view_holes=directory / "unmapped-border-view-holes.png",
         ambiguous_depth_view_holes=directory / "ambiguous-depth-view-holes.png",
@@ -137,6 +147,7 @@ def _completion_preview(
     center_view: np.ndarray,
     request_mask: np.ndarray,
     outpaint_request_mask: np.ndarray,
+    seam_support_mask: np.ndarray,
     *,
     horizontal_padding: int,
 ) -> np.ndarray:
@@ -150,6 +161,10 @@ def _completion_preview(
     magenta = np.array([255.0, 64.0, 192.0], dtype=np.float32)
     center[request_mask] = np.rint(
         center[request_mask].astype(np.float32) * np.float32(0.35) + magenta * np.float32(0.65)
+    ).astype(np.uint8)
+    amber = np.array([255.0, 191.0, 64.0], dtype=np.float32)
+    center[seam_support_mask] = np.rint(
+        center[seam_support_mask].astype(np.float32) * np.float32(0.35) + amber * np.float32(0.65)
     ).astype(np.uint8)
     if canvas.shape[0] != height:
         raise HiddenSurfaceArtifactError("Completion preview height does not match the source")
@@ -211,10 +226,27 @@ def write_hidden_surface_artifacts(
         artifacts.outpaint_request_observation_count,
         plan.outpaint_request_observation_count,
     )
+    _write_mask(artifacts.seam_support_mask, plan.seam_support_mask)
+    _write_array(
+        artifacts.seam_relative_depth_hint,
+        plan.seam_relative_depth_hint,
+    )
+    _write_array(
+        artifacts.seam_support_observation_count,
+        plan.seam_support_observation_count,
+    )
     _write_mask(artifacts.mapped_view_holes, plan.all_mapped_view_holes)
+    _write_mask(
+        artifacts.local_support_view_holes,
+        plan.all_local_support_view_holes,
+    )
     _write_mask(
         artifacts.outpaint_mapped_view_holes,
         plan.all_outpaint_mapped_view_holes,
+    )
+    _write_mask(
+        artifacts.seam_mapped_view_holes,
+        plan.all_seam_mapped_view_holes,
     )
     _write_mask(artifacts.border_view_holes, plan.all_border_view_holes)
     _write_mask(
@@ -232,6 +264,7 @@ def write_hidden_surface_artifacts(
         visibility.center_view,
         plan.request_mask,
         plan.outpaint_request_mask,
+        plan.seam_support_mask,
         horizontal_padding=plan.horizontal_padding,
     )
     _write_png(artifacts.completion_preview, completion_preview)
@@ -308,6 +341,32 @@ def write_hidden_surface_artifacts(
             meaning="number of sampled border holes mapped to each overscan pixel",
             coordinate_space=outpaint_coordinate_space,
         ),
+        "seamSupportMask": {
+            **_artifact_description(
+                artifacts.seam_support_mask,
+                plan.seam_support_mask,
+                meaning="source pixels reused as observed RGB with inferred seam-support depth",
+                coordinate_space=coordinate_space,
+            ),
+            "maskValues": {"0": "excluded", "255": "observed RGB support requested"},
+            "pixelCount": int(np.count_nonzero(plan.seam_support_mask)),
+        },
+        "seamRelativeDepthHint": {
+            **_artifact_description(
+                artifacts.seam_relative_depth_hint,
+                plan.seam_relative_depth_hint,
+                meaning="nearest-edge inferred depth; NaN outside seamSupportMask",
+                coordinate_space=coordinate_space,
+            ),
+            "numericRange": "[0, 1] inside seamSupportMask",
+            "provenance": "inferred depth paired with observed source RGB",
+        },
+        "seamSupportObservationCount": _artifact_description(
+            artifacts.seam_support_observation_count,
+            plan.seam_support_observation_count,
+            meaning="number of sampled edge holes mapped to each observed seam pixel",
+            coordinate_space=coordinate_space,
+        ),
         "mappedViewHoles": {
             **_artifact_description(
                 artifacts.mapped_view_holes,
@@ -317,6 +376,15 @@ def write_hidden_surface_artifacts(
             ),
             "pixelCount": int(np.count_nonzero(plan.all_mapped_view_holes)),
         },
+        "localDepthSupportViewHoles": {
+            **_artifact_description(
+                artifacts.local_support_view_holes,
+                plan.all_local_support_view_holes,
+                meaning="mapped holes whose near/far ordering uses a local 2D depth neighborhood",
+                coordinate_space="union of sampled non-default render viewports",
+            ),
+            "pixelCount": int(np.count_nonzero(plan.all_local_support_view_holes)),
+        },
         "outpaintMappedViewHoles": {
             **_artifact_description(
                 artifacts.outpaint_mapped_view_holes,
@@ -325,6 +393,15 @@ def write_hidden_surface_artifacts(
                 coordinate_space="union of sampled non-default render viewports",
             ),
             "pixelCount": int(np.count_nonzero(plan.all_outpaint_mapped_view_holes)),
+        },
+        "seamMappedViewHoles": {
+            **_artifact_description(
+                artifacts.seam_mapped_view_holes,
+                plan.all_seam_mapped_view_holes,
+                meaning="viewport holes supported by observed RGB and inferred seam depth",
+                coordinate_space="union of sampled non-default render viewports",
+            ),
+            "pixelCount": int(np.count_nonzero(plan.all_seam_mapped_view_holes)),
         },
         "borderViewHoles": {
             **_artifact_description(
@@ -371,7 +448,10 @@ def write_hidden_surface_artifacts(
         "completionPreview": _artifact_description(
             artifacts.completion_preview,
             completion_preview,
-            meaning="display-only view; magenta=hidden surface, cyan=horizontal overscan",
+            meaning=(
+                "display-only view; magenta=hidden surface, cyan=horizontal overscan, "
+                "amber=observed seam support"
+            ),
             coordinate_space=outpaint_coordinate_space,
         ),
     }
@@ -380,6 +460,7 @@ def write_hidden_surface_artifacts(
         "This plan requests generated RGB and generated relative depth; it does not contain either.",
         "Generated hidden surfaces are plausible synthesis, not recovered reality.",
         "Horizontal overscan assumes the nearest visible edge surface continues outward.",
+        "Edge seam support reuses observed RGB with inferred geometry; it is not generated RGB.",
         "Unresolved viewport holes are outside the generation contract and must limit camera motion.",
         "Depth is unitless relative proximity; larger values are nearer.",
         "Finite sampled positions do not prove coverage for every continuous camera position.",
@@ -430,12 +511,33 @@ def write_hidden_surface_artifacts(
                 "separate and overscan exists only outside the observed frame"
             ),
             "minDepthSeparation": config.min_depth_separation,
+            "depthSupportRadius": config.depth_support_radius,
             "maxRequestPixels": config.max_request_pixels,
+        },
+        "geometrySupport": {
+            "edgeSeam": {
+                "mask": artifacts.seam_support_mask.name,
+                "rgbProvenance": "observed source RGB at the aligned canonical coordinate",
+                "depthProvenance": "inferred from the nearest visible edge",
+                "generatedRgb": False,
+            }
         },
         "camera": {
             "model": "orthographic-horizontal-relative-depth",
             "positionRange": [-1.0, 1.0],
             "sampledPositions": list(plan.camera_positions),
+            "sampledPositionsOverride": visibility_config.sampled_positions,
+            "maxSampleShiftStepPixelsRequested": (visibility_config.max_sample_shift_step_pixels),
+            "maxNearShiftStepPixelsObserved": round(
+                max(
+                    abs(right - left) * visibility.max_near_shift_pixels
+                    for left, right in zip(
+                        plan.camera_positions,
+                        plan.camera_positions[1:],
+                    )
+                ),
+                6,
+            ),
             "maxNearShiftPixelsApplied": visibility.max_near_shift_pixels,
             "maxNearShiftFraction": visibility_config.max_near_shift_fraction,
             "samplingLimitation": "finite sampled positions; not a continuous-path proof",
@@ -443,10 +545,15 @@ def write_hidden_surface_artifacts(
         "result": {
             "requestPixels": int(np.count_nonzero(plan.request_mask)),
             "mappedViewportHolePixels": int(np.count_nonzero(plan.all_mapped_view_holes)),
+            "localDepthSupportViewportHolePixels": int(
+                np.count_nonzero(plan.all_local_support_view_holes)
+            ),
             "outpaintRequestPixels": int(np.count_nonzero(plan.outpaint_request_mask)),
             "outpaintMappedViewportHolePixels": int(
                 np.count_nonzero(plan.all_outpaint_mapped_view_holes)
             ),
+            "seamSupportPixels": int(np.count_nonzero(plan.seam_support_mask)),
+            "seamMappedViewportHolePixels": int(np.count_nonzero(plan.all_seam_mapped_view_holes)),
             "totalRequestPixels": int(
                 np.count_nonzero(plan.request_mask) + np.count_nonzero(plan.outpaint_request_mask)
             ),

@@ -21,6 +21,7 @@ class HiddenSurfaceConfig:
     """Limits for mapping viewport holes to a canonical hidden surface."""
 
     min_depth_separation: float = 0.02
+    depth_support_radius: int = 3
     max_request_pixels: int = 2_000_000
 
 
@@ -43,8 +44,10 @@ class HiddenSurfacePlan:
     The per-view masks use viewport coordinates. ``mapped_view_holes`` records
     interior holes represented by the canonical hidden-surface request, while
     ``outpaint_mapped_view_holes`` records holes represented by horizontal
-    overscan. Remaining holes lack a safe mapping. None contains generated
-    content yet.
+    overscan. ``seam_support_mask`` identifies source-grid pixels whose observed
+    RGB can be reused with inferred support depth when a mesh cut reaches the
+    frame. Remaining holes lack a safe mapping. None contains generated content
+    yet.
     """
 
     request_mask: np.ndarray
@@ -54,15 +57,22 @@ class HiddenSurfacePlan:
     outpaint_request_mask: np.ndarray
     outpaint_relative_depth_hint: np.ndarray
     outpaint_request_observation_count: np.ndarray
+    seam_support_mask: np.ndarray
+    seam_relative_depth_hint: np.ndarray
+    seam_support_observation_count: np.ndarray
     horizontal_padding: int
     mapped_view_holes: tuple[np.ndarray, ...]
+    local_support_view_holes: tuple[np.ndarray, ...]
     outpaint_mapped_view_holes: tuple[np.ndarray, ...]
+    seam_mapped_view_holes: tuple[np.ndarray, ...]
     border_view_holes: tuple[np.ndarray, ...]
     unmapped_border_view_holes: tuple[np.ndarray, ...]
     ambiguous_depth_view_holes: tuple[np.ndarray, ...]
     unresolved_view_holes: tuple[np.ndarray, ...]
     all_mapped_view_holes: np.ndarray
+    all_local_support_view_holes: np.ndarray
     all_outpaint_mapped_view_holes: np.ndarray
+    all_seam_mapped_view_holes: np.ndarray
     all_supported_view_holes: np.ndarray
     all_border_view_holes: np.ndarray
     all_unmapped_border_view_holes: np.ndarray
@@ -81,6 +91,12 @@ def validate_hidden_surface_config(config: HiddenSurfaceConfig) -> None:
         or config.min_depth_separation > 1.0
     ):
         raise HiddenSurfaceContractError("min_depth_separation must be finite and in (0, 1]")
+    if (
+        isinstance(config.depth_support_radius, bool)
+        or config.depth_support_radius < 1
+        or config.depth_support_radius > 16
+    ):
+        raise HiddenSurfaceContractError("depth_support_radius must be between 1 and 16")
     if (
         isinstance(config.max_request_pixels, bool)
         or config.max_request_pixels < 1
@@ -184,8 +200,12 @@ def plan_hidden_surfaces(
     request_observation_count = np.zeros((height, width), dtype=np.uint16)
     outpaint_depth_sum = np.zeros((height, outpaint_width), dtype=np.float32)
     outpaint_observation_count = np.zeros((height, outpaint_width), dtype=np.uint16)
+    seam_depth_sum = np.zeros((height, width), dtype=np.float32)
+    seam_observation_count = np.zeros((height, width), dtype=np.uint16)
     mapped_masks: list[np.ndarray] = []
+    local_support_masks: list[np.ndarray] = []
     outpaint_mapped_masks: list[np.ndarray] = []
+    seam_mapped_masks: list[np.ndarray] = []
     border_masks: list[np.ndarray] = []
     unmapped_border_masks: list[np.ndarray] = []
     ambiguous_masks: list[np.ndarray] = []
@@ -202,12 +222,16 @@ def plan_hidden_surfaces(
     ):
         holes = ~coverage
         mapped = np.zeros((height, width), dtype=np.bool_)
+        local_support_mapped = np.zeros((height, width), dtype=np.bool_)
         outpaint_mapped = np.zeros((height, width), dtype=np.bool_)
+        seam_mapped = np.zeros((height, width), dtype=np.bool_)
         border = np.zeros((height, width), dtype=np.bool_)
         ambiguous = np.zeros((height, width), dtype=np.bool_)
         if view_index == center_index:
             mapped_masks.append(mapped)
+            local_support_masks.append(local_support_mapped)
             outpaint_mapped_masks.append(outpaint_mapped)
+            seam_mapped_masks.append(seam_mapped)
             border_masks.append(border)
             unmapped_border_masks.append(border.copy())
             ambiguous_masks.append(ambiguous)
@@ -249,18 +273,58 @@ def plan_hidden_surfaces(
                             atlas_x,
                             np.uint16(1),
                         )
+                    seam_candidates = ~outpaint_valid
+                    canonical_source_x = _rounded_pixel(canonical_float)
+                    seam_valid = (
+                        seam_candidates & (canonical_source_x >= 0) & (canonical_source_x < width)
+                    )
+                    if seam_valid.any():
+                        valid_view_x = view_x_int[seam_valid]
+                        valid_source_x = canonical_source_x[seam_valid]
+                        seam_mapped[y, valid_view_x] = True
+                        np.add.at(
+                            seam_depth_sum[y],
+                            valid_source_x,
+                            np.float32(support_depth),
+                        )
+                        np.add.at(
+                            seam_observation_count[y],
+                            valid_source_x,
+                            np.uint16(1),
+                        )
                     continue
-                left_depth = float(depth[y, start - 1])
-                right_depth = float(depth[y, stop])
-                if position > 0.0:
-                    near_depth = left_depth
-                    far_depth = right_depth
-                else:
-                    near_depth = right_depth
-                    far_depth = left_depth
-                if near_depth - far_depth < settings.min_depth_separation:
+                left_start = max(0, start - settings.depth_support_radius)
+                right_stop = min(width, stop + settings.depth_support_radius)
+                left_depths = depth[y, left_start:start]
+                right_depths = depth[y, stop:right_stop]
+                left_support = left_depths[np.isfinite(left_depths)]
+                right_support = right_depths[np.isfinite(right_depths)]
+                if left_support.size == 0 or right_support.size == 0:
                     ambiguous[y, start:stop] = True
                     continue
+                if position > 0.0:
+                    near_depth = float(left_support.max())
+                    far_depth = float(right_support.min())
+                else:
+                    near_depth = float(right_support.max())
+                    far_depth = float(left_support.min())
+                used_local_support = False
+                if near_depth - far_depth < settings.min_depth_separation:
+                    top = max(0, y - settings.depth_support_radius)
+                    bottom = min(height, y + settings.depth_support_radius + 1)
+                    local_left = max(0, start - settings.depth_support_radius)
+                    local_right = min(width, stop + settings.depth_support_radius)
+                    local_depths = depth[top:bottom, local_left:local_right]
+                    local_support = local_depths[np.isfinite(local_depths)]
+                    if local_support.size == 0:
+                        ambiguous[y, start:stop] = True
+                        continue
+                    near_depth = float(local_support.max())
+                    far_depth = float(local_support.min())
+                    if near_depth - far_depth < settings.min_depth_separation:
+                        ambiguous[y, start:stop] = True
+                        continue
+                    used_local_support = True
 
                 view_x = np.arange(start, stop, dtype=np.float32)
                 canonical_x = _rounded_pixel(
@@ -275,6 +339,8 @@ def plan_hidden_surfaces(
                     valid_view_x = view_x_int[valid]
                     valid_canonical_x = canonical_x[valid]
                     mapped[y, valid_view_x] = True
+                    if used_local_support:
+                        local_support_mapped[y, valid_view_x] = True
                     np.minimum.at(
                         request_depth_hint[y],
                         valid_canonical_x,
@@ -301,6 +367,8 @@ def plan_hidden_surfaces(
                     atlas_x = canonical_x[outpaint_valid] + horizontal_padding
                     border[y, valid_view_x] = True
                     outpaint_mapped[y, valid_view_x] = True
+                    if used_local_support:
+                        local_support_mapped[y, valid_view_x] = True
                     np.add.at(
                         outpaint_depth_sum[y],
                         atlas_x,
@@ -313,11 +381,17 @@ def plan_hidden_surfaces(
                     )
 
         mapped_masks.append(np.ascontiguousarray(mapped))
+        local_support_masks.append(np.ascontiguousarray(local_support_mapped))
         outpaint_mapped_masks.append(np.ascontiguousarray(outpaint_mapped))
+        seam_mapped_masks.append(np.ascontiguousarray(seam_mapped))
         border_masks.append(np.ascontiguousarray(border))
-        unmapped_border_masks.append(np.ascontiguousarray(border & ~outpaint_mapped))
+        unmapped_border_masks.append(
+            np.ascontiguousarray(border & ~(outpaint_mapped | seam_mapped))
+        )
         ambiguous_masks.append(np.ascontiguousarray(ambiguous))
-        unresolved_masks.append(np.ascontiguousarray(holes & ~(mapped | outpaint_mapped)))
+        unresolved_masks.append(
+            np.ascontiguousarray(holes & ~(mapped | outpaint_mapped | seam_mapped))
+        )
 
     request_mask = request_observation_count > 0
     outpaint_request_mask = outpaint_observation_count > 0
@@ -329,6 +403,11 @@ def plan_hidden_surfaces(
     outpaint_depth_hint[outpaint_request_mask] = outpaint_depth_sum[
         outpaint_request_mask
     ] / outpaint_observation_count[outpaint_request_mask].astype(np.float32)
+    seam_support_mask = seam_observation_count > 0
+    seam_depth_hint = np.full((height, width), np.nan, dtype=np.float32)
+    seam_depth_hint[seam_support_mask] = seam_depth_sum[seam_support_mask] / seam_observation_count[
+        seam_support_mask
+    ].astype(np.float32)
     request_pixels = int(np.count_nonzero(request_mask) + np.count_nonzero(outpaint_request_mask))
     if request_pixels > settings.max_request_pixels:
         raise HiddenSurfaceContractError(
@@ -346,10 +425,16 @@ def plan_hidden_surfaces(
     request_depth_ceiling[~request_mask] = np.nan
     non_default_indices = [index for index in range(len(mapped_masks)) if index != center_index]
     all_mapped = np.logical_or.reduce([mapped_masks[index] for index in non_default_indices])
+    all_local_support = np.logical_or.reduce(
+        [local_support_masks[index] for index in non_default_indices]
+    )
     all_outpaint_mapped = np.logical_or.reduce(
         [outpaint_mapped_masks[index] for index in non_default_indices]
     )
-    all_supported = all_mapped | all_outpaint_mapped
+    all_seam_mapped = np.logical_or.reduce(
+        [seam_mapped_masks[index] for index in non_default_indices]
+    )
+    all_supported = all_mapped | all_outpaint_mapped | all_seam_mapped
     all_border = np.logical_or.reduce([border_masks[index] for index in non_default_indices])
     all_unmapped_border = np.logical_or.reduce(
         [unmapped_border_masks[index] for index in non_default_indices]
@@ -366,15 +451,22 @@ def plan_hidden_surfaces(
         outpaint_request_mask=np.ascontiguousarray(outpaint_request_mask),
         outpaint_relative_depth_hint=np.ascontiguousarray(outpaint_depth_hint),
         outpaint_request_observation_count=np.ascontiguousarray(outpaint_observation_count),
+        seam_support_mask=np.ascontiguousarray(seam_support_mask),
+        seam_relative_depth_hint=np.ascontiguousarray(seam_depth_hint),
+        seam_support_observation_count=np.ascontiguousarray(seam_observation_count),
         horizontal_padding=horizontal_padding,
         mapped_view_holes=tuple(mapped_masks),
+        local_support_view_holes=tuple(local_support_masks),
         outpaint_mapped_view_holes=tuple(outpaint_mapped_masks),
+        seam_mapped_view_holes=tuple(seam_mapped_masks),
         border_view_holes=tuple(border_masks),
         unmapped_border_view_holes=tuple(unmapped_border_masks),
         ambiguous_depth_view_holes=tuple(ambiguous_masks),
         unresolved_view_holes=tuple(unresolved_masks),
         all_mapped_view_holes=np.ascontiguousarray(all_mapped),
+        all_local_support_view_holes=np.ascontiguousarray(all_local_support),
         all_outpaint_mapped_view_holes=np.ascontiguousarray(all_outpaint_mapped),
+        all_seam_mapped_view_holes=np.ascontiguousarray(all_seam_mapped),
         all_supported_view_holes=np.ascontiguousarray(all_supported),
         all_border_view_holes=np.ascontiguousarray(all_border),
         all_unmapped_border_view_holes=np.ascontiguousarray(all_unmapped_border),

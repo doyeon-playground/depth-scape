@@ -59,6 +59,8 @@ class MeshVisibilityBaselineTests(unittest.TestCase):
             self.assertTrue(np.any(all_holes == 255))
             self.assertEqual(manifest["camera"]["positionRange"], [-1.0, 1.0])
             self.assertEqual(manifest["camera"]["sampledPositions"], [-1.0, 0.0, 1.0])
+            self.assertIsNone(manifest["camera"]["sampledPositionsOverride"])
+            self.assertLessEqual(manifest["camera"]["maxNearShiftStepPixelsObserved"], 2.0)
             self.assertTrue(manifest["result"]["defaultViewPixelIdenticalAtRenderResolution"])
             self.assertEqual(
                 manifest["artifacts"]["allViewHoles"]["sha256"],

@@ -54,7 +54,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--sampled-positions",
         type=int,
         default=defaults.sampled_positions,
-        help="Odd number of camera positions including both endpoints and the source view",
+        help=(
+            "Optional odd camera-position count; by default it is derived from the "
+            "maximum sample shift step"
+        ),
+    )
+    parser.add_argument(
+        "--max-sample-shift-step-pixels",
+        type=int,
+        default=defaults.max_sample_shift_step_pixels,
+        help="Maximum nearest-surface pixel displacement between automatic samples",
     )
     parser.add_argument(
         "--overwrite",
@@ -73,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         max_near_shift_fraction=args.max_near_shift_fraction,
         max_near_shift_pixels=args.max_near_shift_pixels,
         sampled_positions=args.sampled_positions,
+        max_sample_shift_step_pixels=args.max_sample_shift_step_pixels,
     )
     try:
         artifacts = run_mesh_visibility_baseline(
