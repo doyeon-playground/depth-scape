@@ -25,13 +25,20 @@ class MeshVisibilityConfig:
     max_faces: int = 500_000
     max_near_shift_fraction: float = 0.02
     max_near_shift_pixels: int = 64
-    sampled_positions: int = 3
+    sampled_positions: int | None = None
+    max_sample_shift_step_pixels: int = 2
     hole_color: tuple[int, int, int] = (0, 0, 0)
 
 
 @dataclass(frozen=True)
 class MeshVisibilityPlan:
-    """Rendered endpoints and missing-pixel masks for a bounded camera path."""
+    """Rendered endpoints and missing-pixel masks for a bounded camera path.
+
+    ``sampled_coverages`` and ``sampled_depths`` remain in viewport coordinates
+    and align one-to-one with ``camera_positions``. They are retained in memory
+    so later stages can distinguish depth-consistent disocclusions from generic
+    black viewport pixels without rendering the mesh a second time.
+    """
 
     center_view: np.ndarray
     left_view: np.ndarray
@@ -45,6 +52,8 @@ class MeshVisibilityPlan:
     max_near_shift_pixels: int
     camera_positions: tuple[float, ...]
     render_seconds: tuple[float, ...]
+    sampled_coverages: tuple[np.ndarray, ...]
+    sampled_depths: tuple[np.ndarray, ...]
     default_view_pixel_identical: bool
 
 
@@ -69,13 +78,21 @@ def _validate_config(config: MeshVisibilityConfig) -> None:
         or config.max_near_shift_pixels > 256
     ):
         raise MeshVisibilityError("max_near_shift_pixels must be between 1 and 256")
-    if (
+    if config.sampled_positions is not None and (
         isinstance(config.sampled_positions, bool)
         or config.sampled_positions < 3
         or config.sampled_positions > 33
         or config.sampled_positions % 2 == 0
     ):
-        raise MeshVisibilityError("sampled_positions must be an odd integer between 3 and 33")
+        raise MeshVisibilityError(
+            "sampled_positions must be None or an odd integer between 3 and 33"
+        )
+    if (
+        isinstance(config.max_sample_shift_step_pixels, bool)
+        or config.max_sample_shift_step_pixels < 1
+        or config.max_sample_shift_step_pixels > 64
+    ):
+        raise MeshVisibilityError("max_sample_shift_step_pixels must be between 1 and 64")
     if len(config.hole_color) != 3 or any(
         isinstance(value, bool) or not isinstance(value, int) or value < 0 or value > 255
         for value in config.hole_color
@@ -127,9 +144,13 @@ def plan_mesh_visibility(
         max(1, int(round(render_width * settings.max_near_shift_fraction))),
         settings.max_near_shift_pixels,
     )
+    if settings.sampled_positions is None:
+        half_intervals = math.ceil(max_near_shift_pixels / settings.max_sample_shift_step_pixels)
+        sampled_positions = min(33, half_intervals * 2 + 1)
+    else:
+        sampled_positions = settings.sampled_positions
     camera_positions = tuple(
-        float(value)
-        for value in np.linspace(-1.0, 1.0, settings.sampled_positions, dtype=np.float32)
+        float(value) for value in np.linspace(-1.0, 1.0, sampled_positions, dtype=np.float32)
     )
     rendered: list[MeshRenderResult] = []
     render_seconds: list[float] = []
@@ -149,7 +170,7 @@ def plan_mesh_visibility(
         render_seconds.append(time.perf_counter() - started)
         rendered.append(view)
 
-    center_index = settings.sampled_positions // 2
+    center_index = sampled_positions // 2
     center_geometry_holes = ~rendered[center_index].coverage
     left_view_holes = ~rendered[0].coverage
     right_view_holes = ~rendered[-1].coverage
@@ -180,5 +201,7 @@ def plan_mesh_visibility(
         max_near_shift_pixels=max_near_shift_pixels,
         camera_positions=camera_positions,
         render_seconds=tuple(render_seconds),
+        sampled_coverages=tuple(view.coverage for view in rendered),
+        sampled_depths=tuple(view.depth for view in rendered),
         default_view_pixel_identical=bool(np.array_equal(center_view, expected_default)),
     )

@@ -73,10 +73,11 @@ reconstruction are also outside the project scope.
 
 DepthScape is currently in the **baseline-evaluation** stage. Reproducible
 relative-depth and cut continuous-mesh pipelines are available, together with
-a bounded, z-buffered Python rendering baseline. The earlier three-layer
-pipeline remains only for reproducible comparison. The next experiment will
-turn measured mesh disocclusions into coherent hidden-surface completion
-requests before generating any RGB or depth.
+a bounded, z-buffered Python rendering baseline and explicit hidden RGB/depth
+completion requests. The earlier three-layer pipeline remains only for
+reproducible comparison. Phase 3 will evaluate replaceable RGB and relative-
+depth completion adapters against these requests; no generated content is
+included yet.
 
 ## Try the depth and mesh baselines
 
@@ -94,6 +95,9 @@ depth-scape-mesh demo-landscape.png \
 depth-scape-render \
   --mesh-run-dir runs/demo-mesh \
   --output-dir runs/demo-mesh-camera
+depth-scape-hidden \
+  --mesh-run-dir runs/demo-mesh \
+  --output-dir runs/demo-hidden
 
 # Optional comparison with the earlier three-layer baseline
 depth-scape-layers demo-landscape.png \
@@ -120,16 +124,26 @@ available through `--no-boundary-refinement` for comparison. See
 [experiment 0004](docs/experiments/0004-continuous-depth-mesh.md) for the
 original geometry contract.
 
-The render command safely validates a mesh run and rasterizes three bounded
-horizontal camera positions with a deterministic CPU z-buffer. Camera position
-is normalized to `[-1, 1]`; position `0` is the observed source composition,
-while the endpoint views reveal currently unsupported pixels. It exports the
+The render command safely validates a mesh run and rasterizes a bounded
+horizontal camera path with a deterministic CPU z-buffer. Camera position is
+normalized to `[-1, 1]`; position `0` is the observed source composition. By
+default, the sample count is derived so the nearest surface moves no more than
+two render pixels between samples, up to a 33-position cap. It exports the
 center and endpoint views, separates source-view geometry gaps from movement
-disocclusions, and records the sampled camera contract in `mesh-camera.json`.
-The default output is limited to 512 pixels on its longest side and is an
-accuracy baseline rather than the final interactive renderer. See
+disocclusions, and records the finite sampled-camera contract in
+`mesh-camera.json`. The default output is limited to 512 pixels on its longest
+side and is an accuracy baseline rather than the final interactive renderer. See
 [experiment 0005](docs/experiments/0005-mesh-visibility.md) for measured
 coverage and runtime.
+
+The hidden-surface command converts sampled viewport holes into two coupled
+RGB-and-relative-depth generation requests: a canonical hidden surface behind
+occluders and narrow horizontal overscan outside the observed frame. Small
+frame-touching mesh seams reuse aligned observed RGB with separately inferred
+support depth instead of being mislabeled as generated content. It writes masks
+and numeric constraints outside JSON, records provenance in
+`hidden-surface-plan.json`, and never overwrites observed center pixels. See
+[experiment 0006](docs/experiments/0006-hidden-surface-contract.md).
 
 The layer and planning commands remain available as reproducible comparison
 baselines. Their fixed three-band camera and completion masks are not the final
@@ -159,9 +173,11 @@ for the exact model revision, weight digest, artifact contract, and known risks.
 - [Camera and disocclusion experiment](docs/experiments/0003-disocclusion-planner.md)
 - [Continuous-depth mesh experiment](docs/experiments/0004-continuous-depth-mesh.md)
 - [Mesh visibility and boundary-refinement experiment](docs/experiments/0005-mesh-visibility.md)
+- [Hidden-surface completion-request experiment](docs/experiments/0006-hidden-surface-contract.md)
 - [Scope decision](docs/decisions/0001-focus-on-landscape-2-5d.md)
 - [Python viewer decision](docs/decisions/0002-use-local-python-viewer.md)
 - [Continuous-depth mesh decision](docs/decisions/0003-use-cut-continuous-depth-mesh.md)
+- [Coupled hidden-surface request decision](docs/decisions/0004-couple-hidden-rgb-and-depth.md)
 - [Internationalization](docs/i18n.md)
 - [Contributing](CONTRIBUTING.md)
 
