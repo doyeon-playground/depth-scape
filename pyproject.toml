@@ -26,6 +26,7 @@ depth-scape-depth = "depth_scape.cli:main"
 depth-scape-layers = "depth_scape.layers_cli:main"
 depth-scape-mesh = "depth_scape.mesh_cli:main"
 depth-scape-render = "depth_scape.mesh_visibility_cli:main"
+depth-scape-hidden = "depth_scape.hidden_surface_cli:main"
 depth-scape-plan = "depth_scape.visibility_cli:main"
 
 [tool.setuptools]

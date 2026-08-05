@@ -64,6 +64,16 @@ class MeshVisibilityTests(unittest.TestCase):
         )
         self.assertEqual(plan.camera_positions, (-1.0, 0.0, 1.0))
         self.assertEqual(plan.max_near_shift_pixels, 1)
+        self.assertEqual(len(plan.sampled_coverages), 3)
+        self.assertEqual(len(plan.sampled_depths), 3)
+        for coverage, depth in zip(
+            plan.sampled_coverages,
+            plan.sampled_depths,
+            strict=True,
+        ):
+            self.assertEqual(coverage.dtype, np.bool_)
+            self.assertEqual(depth.dtype, np.float32)
+            np.testing.assert_array_equal(np.isfinite(depth), coverage)
 
     def test_refined_cut_preserves_simple_center_coverage_and_reveals_motion_holes(self) -> None:
         mesh = _loaded_mesh(cut=True)

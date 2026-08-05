@@ -31,7 +31,13 @@ class MeshVisibilityConfig:
 
 @dataclass(frozen=True)
 class MeshVisibilityPlan:
-    """Rendered endpoints and missing-pixel masks for a bounded camera path."""
+    """Rendered endpoints and missing-pixel masks for a bounded camera path.
+
+    ``sampled_coverages`` and ``sampled_depths`` remain in viewport coordinates
+    and align one-to-one with ``camera_positions``. They are retained in memory
+    so later stages can distinguish depth-consistent disocclusions from generic
+    black viewport pixels without rendering the mesh a second time.
+    """
 
     center_view: np.ndarray
     left_view: np.ndarray
@@ -45,6 +51,8 @@ class MeshVisibilityPlan:
     max_near_shift_pixels: int
     camera_positions: tuple[float, ...]
     render_seconds: tuple[float, ...]
+    sampled_coverages: tuple[np.ndarray, ...]
+    sampled_depths: tuple[np.ndarray, ...]
     default_view_pixel_identical: bool
 
 
@@ -180,5 +188,7 @@ def plan_mesh_visibility(
         max_near_shift_pixels=max_near_shift_pixels,
         camera_positions=camera_positions,
         render_seconds=tuple(render_seconds),
+        sampled_coverages=tuple(view.coverage for view in rendered),
+        sampled_depths=tuple(view.depth for view in rendered),
         default_view_pixel_identical=bool(np.array_equal(center_view, expected_default)),
     )
